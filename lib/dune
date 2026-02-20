@@ -1,0 +1,51 @@
+(library
+ (name ml)
+ (public_name uniq.ml)
+ (modules uniq_ml)
+ (wrapped false)
+ (libraries codept-lib codept-lib.bundled compiler-libs logs fmt fpath))
+
+(library
+ (name uniq_mod)
+ (public_name uniq.mod)
+ (modules uniq_mod uniq_info uniq_digest uniq_resolve)
+ (wrapped false)
+ (libraries uniq.ml bos fpath))
+
+(library
+ (name uniq_top)
+ (public_name uniq.top)
+ (modules uniq_top)
+ (wrapped false)
+ (libraries compiler-libs.toplevel uniq.mod fmt.tty logs.fmt))
+
+(library
+ (name uniq_cfg)
+ (public_name uniq.cfg)
+ (modules uniq_cfg)
+ (wrapped false)
+ (libraries
+  cmdliner
+  compiler-libs
+  fpath
+  astring
+  rresult
+  bos
+  fmt.tty
+  logs.fmt))
+
+(library
+ (name uniq_solve)
+ (public_name uniq.solve)
+ (modules uniq_solve)
+ (wrapped false)
+ (libraries fmt fpath opam-format opam-state opam-core))
+
+(ocamllex uniq_meta_lexer)
+
+(library
+ (name uniq_meta)
+ (public_name uniq.meta)
+ (modules uniq_meta uniq_meta_lexer)
+ (wrapped false)
+ (libraries cmdliner logs fmt fpath bos uniq.mod))

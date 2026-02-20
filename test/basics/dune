@@ -1,0 +1,3 @@
+(cram
+ (package uniq)
+ (deps %{bin:info}))
