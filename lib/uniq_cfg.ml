@@ -100,10 +100,10 @@ let parse_field : type a.
       if Sys.is_directory str then Fpath.(to_dir_path (v str))
       else if Sys.file_exists str then Fpath.v str
       else Option.fold ~none:default ~some:(fun fn -> fn ()) or_fail
-  | Some str, Int, or_fail -> begin
-      try int_of_string str
+  | Some str, Int, or_fail ->
+      begin try int_of_string str
       with _ -> Option.fold ~none:default ~some:(fun fn -> fn ()) or_fail
-    end
+      end
   | _, _, None -> default
   | _, _, Some or_fail -> or_fail ()
 
@@ -276,10 +276,14 @@ let cast : type a b. a value -> a -> b value -> b option =
   | Path, List (_, String), v -> Some [ Fpath.to_string v ]
   | List (sep, String), String, v -> Some (String.concat sep v)
   | Int, String, v -> Some (string_of_int v)
-  | String, Int, v -> begin try Some (int_of_string v) with _ -> None end
+  | String, Int, v ->
+      begin try Some (int_of_string v) with _ -> None
+      end
   | Int, Bool, 0 -> Some false
   | Int, Bool, _ -> Some true
-  | String, Path, v -> begin try Some (Fpath.v v) with _ -> None end
+  | String, Path, v ->
+      begin try Some (Fpath.v v) with _ -> None
+      end
   | _ -> None
 
 let get : type a. ?native:bool option -> t -> key:string -> a value -> a option
@@ -365,9 +369,7 @@ let compiler =
     match String.lowercase_ascii str with
     | "bytecode" -> Ok `Bytecode
     | "native" -> Ok `Native
-    | _ ->
-        Rresult.R.error_msgf "Invalid compiler %S (must be bytecode or native)"
-          str
+    | _ -> error_msgf "Invalid compiler %S (must be bytecode or native)" str
   in
   let pp ppf = function
     | `Bytecode -> Fmt.string ppf "bytecode"

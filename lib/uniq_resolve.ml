@@ -259,7 +259,7 @@ let common_path paths =
   | prefix :: paths -> List.fold_left fold prefix paths
   | [] -> assert false (* XXX(dinosaure): see [from_sources]. *)
 
-let from_sources ~cmis = function
+let from_sources ~stdlib ~cmis = function
   | [] -> []
   | sources ->
       let current = common_path sources in
@@ -275,7 +275,7 @@ let from_sources ~cmis = function
         List.map (Fun.compose Unitname.modulize Fpath.to_string) sources
       in
       let sources = List.map Unitname.filepath sources in
-      let { Unit.ml; Unit.mli } = Uniq_ml.run_into ~current sources in
+      let { Unit.ml; Unit.mli } = Uniq_ml.run_into ~stdlib ~current sources in
       List.map
         begin fun u ->
           let intfs, impls =
@@ -308,7 +308,14 @@ let from_sources ~cmis = function
 let ( let* ) = Result.bind
 let failwith_error_msg = function Ok v -> v | Error (`Msg msg) -> failwith msg
 
-let qualify files =
+let is_stdlib t =
+  let name = Modname.to_string (Info.modname t) in
+  String.equal name "Stdlib"
+  || (String.length name > 8 && String.sub name 0 8 = "Stdlib__")
+  || (String.length name > 11 && String.sub name 0 11 = "Camlinternal")
+  || String.equal name "Std_exit"
+
+let qualify ?(stdlib = true) files =
   let part location =
     OS.File.with_ic location @@ fun ic () ->
     match Misc.Magic_number.read_info ic with
@@ -321,10 +328,11 @@ let qualify files =
   let objects, sources = List.partition_map part files in
   let objects = qualify_objects objects in
   let cmis, _ = List.partition Info.is_a_cmi objects in
-  let sources = from_sources ~cmis sources in
+  let cmis = List.filter (Fun.negate is_stdlib) cmis in
+  let sources = from_sources ~stdlib ~cmis sources in
   List.rev_append objects sources
 
-let qualify lst =
+let qualify ?(stdlib = true) lst =
   let fn acc x =
     let* loc = to_locations x in
     let* acc = acc in
@@ -332,4 +340,4 @@ let qualify lst =
   in
   let* locations = List.fold_left fn (Ok []) lst in
   let locations = List.concat locations in
-  try Ok (qualify locations) with Failure msg -> Error (`Msg msg)
+  try Ok (qualify ~stdlib locations) with Failure msg -> Error (`Msg msg)

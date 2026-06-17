@@ -3,8 +3,8 @@ let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
 let run path (mpath : Uniq_info.Path.t option) =
   match Uniq_info.v path with
   | Error _ as err -> err
-  | Ok v -> begin
-      match (Uniq_info.exports v, mpath) with
+  | Ok v ->
+      begin match (Uniq_info.exports v, mpath) with
       | [], _ -> assert false (* TODO(dinosaure): should never occur! *)
       | [ (_path, Some digest) ], None -> Ok digest
       | [ (_path, None) ], None ->
@@ -19,8 +19,8 @@ let run path (mpath : Uniq_info.Path.t option) =
           error_msgf
             "%a exports multiple artifacts, you must precise the module name"
             Fpath.pp path
-      | exports, Some p' -> begin
-          match
+      | exports, Some p' ->
+          begin match
             List.find_opt
               (fun (p, _) -> Uniq_info.Path.compare p p' = 0)
               exports
@@ -32,8 +32,8 @@ let run path (mpath : Uniq_info.Path.t option) =
               error_msgf "%a does not export a digest of %a" Fpath.pp path
                 Uniq_info.Path.pp p
           | Some (_, Some digest) -> Ok digest
-        end
-    end
+          end
+      end
 
 let run () quiet path modname =
   match run path modname with

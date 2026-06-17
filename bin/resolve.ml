@@ -29,15 +29,15 @@ let run cfg recurse root no_stdlib ocamlfind_roots =
   let srcs =
     match cfg with
     | None -> [ sources ]
-    | Some cfg -> begin
-        if no_stdlib then [ sources ]
+    | Some cfg ->
+        begin if no_stdlib then [ sources ]
         else
           match Uniq_cfg.(get cfg ~key:"standard_library" Value.path) with
           | Some stdlib -> [ sources; Uniq_resolve.Src.objects stdlib ]
           | None -> [ sources ]
-      end
+        end
   in
-  let* ts = Uniq_resolve.qualify srcs in
+  let* ts = Uniq_resolve.qualify ~stdlib:(not no_stdlib) srcs in
   let intfs, impls =
     let fn (intfs, impls) t =
       let intfs', impls' = Uniq_info.missing t in

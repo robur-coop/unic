@@ -12,4 +12,6 @@ module Src : sig
 end
 
 val qualify_objects : Uniq_info.t list -> Uniq_info.t list
-val qualify : Src.t list -> (Uniq_info.t list, [> `Msg of string ]) result
+
+val qualify :
+  ?stdlib:bool -> Src.t list -> (Uniq_info.t list, [> `Msg of string ]) result

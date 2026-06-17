@@ -177,12 +177,12 @@ let string lexbuf =
 let rec predicates lexbuf acc =
   match Uniq_meta_lexer.token lexbuf with
   | Rparen -> List.rev acc
-  | Name predicate -> begin
-      match Uniq_meta_lexer.token lexbuf with
+  | Name predicate ->
+      begin match Uniq_meta_lexer.token lexbuf with
       | Comma -> predicates lexbuf (Include predicate :: acc)
       | Rparen -> List.rev (Include predicate :: acc)
       | token -> invalid_token lexbuf token
-    end
+      end
   | Minus ->
       let predicate = name lexbuf in
       begin match Uniq_meta_lexer.token lexbuf with
@@ -200,8 +200,8 @@ let rec parser lexbuf depth acc =
         "Closing parenthesis without matching opening one"
   | Eof when depth = 0 -> List.rev acc
   | Eof -> raise_parser_error lexbuf "%d closing parenthesis missing" depth
-  | Name name -> begin
-      match Uniq_meta_lexer.token lexbuf with
+  | Name name ->
+      begin match Uniq_meta_lexer.token lexbuf with
       | String value ->
           lparen lexbuf;
           let contents = parser lexbuf (succ depth) [] in
@@ -224,7 +224,7 @@ let rec parser lexbuf depth acc =
           | token -> invalid_token lexbuf token
           end
       | token -> invalid_token lexbuf token
-    end
+      end
   | token -> invalid_token lexbuf token
 
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
@@ -343,8 +343,8 @@ let ancestors ~roots ?(predicates = [ "native"; "byte" ]) mpath =
   let rec go acc visited = function
     | [] -> Ok acc
     | mpath :: todo when List.mem mpath visited -> go acc visited todo
-    | mpath :: todo -> begin
-        match search ~roots ~predicates mpath with
+    | mpath :: todo ->
+        begin match search ~roots ~predicates mpath with
         | Ok pkgs ->
             let requires = List.concat (List.map dependencies_of pkgs) in
             let fn (path, descr) = (mpath, path, descr) in
@@ -352,7 +352,7 @@ let ancestors ~roots ?(predicates = [ "native"; "byte" ]) mpath =
             go (List.rev_append pkgs acc) (mpath :: visited)
               (List.rev_append requires todo)
         | Error _ as err -> err
-      end
+        end
   in
   let* lst = go [] [] [ mpath ] in
   Ok (sort lst |> List.rev)
@@ -411,11 +411,11 @@ let submodules path =
    return the directory where its .cmi files live. *)
 let package_directory dname descr =
   match List.assoc_opt "directory" descr with
-  | Some [ d ] when d <> "" -> begin
-      match Fpath.of_string d with
+  | Some [ d ] when d <> "" ->
+      begin match Fpath.of_string d with
       | Ok rel -> Fpath.(dname // rel |> to_dir_path)
       | Error _ -> Fpath.to_dir_path dname
-    end
+      end
   | _ -> Fpath.to_dir_path dname
 
 (* Register [full_ks] as a provider of [modname] in [acc] when [modname] is

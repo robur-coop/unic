@@ -1,4 +1,4 @@
-open Rresult
+let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
 
 let show () quiet location =
   match Uniq_info.v location with
@@ -34,7 +34,7 @@ let file =
   let parser str =
     match Fpath.of_string str with
     | Ok _ as v when Sys.file_exists str && Sys.is_directory str = false -> v
-    | Ok v -> R.error_msgf "%a is not a file or does not exist" Fpath.pp v
+    | Ok v -> error_msgf "%a is not a file or does not exist" Fpath.pp v
     | Error _ as err -> err
   in
   let existing_file = Arg.conv (parser, Fpath.pp) in
@@ -54,7 +54,7 @@ let directories =
   let parser str =
     match Fpath.of_string str with
     | Ok _ as v when Sys.file_exists str && Sys.is_directory str -> v
-    | Ok v -> R.error_msgf "%a is not a directory or does not exist" Fpath.pp v
+    | Ok v -> error_msgf "%a is not a directory or does not exist" Fpath.pp v
     | Error _ as err -> err
   in
   let open Arg in

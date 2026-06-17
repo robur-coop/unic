@@ -51,13 +51,13 @@ let run cfg recurse root no_stdlib =
   let srcs =
     match cfg with
     | None -> [ sources ]
-    | Some cfg -> begin
-        if no_stdlib then [ sources ]
+    | Some cfg ->
+        begin if no_stdlib then [ sources ]
         else
           match Uniq_cfg.(get cfg ~key:"standard_library" Value.path) with
           | Some stdlib -> [ sources; Uniq_resolve.Src.objects stdlib ]
           | None -> [ sources ]
-      end
+        end
   in
   let* ts = Uniq_resolve.qualify srcs in
   let module Set = Set.Make (Modname) in

@@ -24,14 +24,7 @@
  (public_name uniq.cfg)
  (modules uniq_cfg)
  (wrapped false)
- (libraries
-  cmdliner
-  compiler-libs
-  fpath
-  astring
-  bos
-  fmt.tty
-  logs.fmt))
+ (libraries cmdliner compiler-libs fpath astring bos fmt.tty logs.fmt))
 
 (library
  (name uniq_solve)

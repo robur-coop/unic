@@ -20,8 +20,8 @@ let opam_packages_of_meta_dirs ~switch_state meta_dirs =
       let matches =
         List.exists
           (fun meta_s ->
-            (String.length meta_s >= String.length lib_s
-            && String.sub meta_s 0 (String.length lib_s) = lib_s)
+            String.length meta_s >= String.length lib_s
+            && String.sub meta_s 0 (String.length lib_s) = lib_s
             || meta_s = lib_s)
           meta_dir_strs
       in
