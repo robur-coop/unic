@@ -1,34 +1,34 @@
-(library
- (name args)
- (modules args)
- (libraries cmdliner fmt.tty fmt.cli logs.fmt logs.cli))
-
-(executable
- (name info)
- (public_name uniq.info)
- (modules info)
- (libraries args uniq.mod))
-
-(executable
- (name qualify)
- (public_name uniq.qualify)
- (modules qualify)
- (libraries args uniq.mod uniq.cfg))
-
-(executable
- (name resolve)
- (public_name uniq.resolve)
- (modules resolve)
- (libraries args uniq.mod uniq.cfg uniq.meta))
-
-(executable
- (name meta)
- (public_name uniq.meta)
- (modules meta)
- (libraries args uniq.meta))
-
-(executable
- (name digest)
- (public_name uniq.digest)
- (modules digest)
- (libraries cmdliner args uniq.mod))
+; (library
+;  (name args)
+;  (modules args)
+;  (libraries cmdliner fmt.tty fmt.cli logs.fmt logs.cli))
+; 
+; (executable
+;  (name info)
+;  (public_name uniq.info)
+;  (modules info)
+;  (libraries args uniq.mod))
+; 
+; (executable
+;  (name qualify)
+;  (public_name uniq.qualify)
+;  (modules qualify)
+;  (libraries args uniq.mod uniq.cfg))
+; 
+; (executable
+;  (name resolve)
+;  (public_name uniq.resolve)
+;  (modules resolve)
+;  (libraries args uniq.mod uniq.cfg uniq.meta))
+; 
+; (executable
+;  (name meta)
+;  (public_name uniq.meta)
+;  (modules meta)
+;  (libraries args uniq.meta))
+; 
+; (executable
+;  (name digest)
+;  (public_name uniq.digest)
+;  (modules digest)
+;  (libraries cmdliner args uniq.mod))
