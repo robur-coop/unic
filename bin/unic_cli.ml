@@ -90,9 +90,11 @@ let setup_sources = Term.(const setup_sources $ sources)
 
 let setup_logs utf_8 style_renderer sources level =
   Stdlib.Option.iter (Fmt.set_style_renderer Fmt.stdout) style_renderer;
+  Stdlib.Option.iter (Fmt.set_style_renderer Fmt.stderr) style_renderer;
   Fmt.set_utf_8 Fmt.stdout utf_8;
+  Fmt.set_utf_8 Fmt.stderr utf_8;
   Logs.set_level level;
-  Logs.set_reporter (reporter sources Fmt.stdout);
+  Logs.set_reporter (reporter sources Fmt.stderr);
   Stdlib.Option.is_none level
 
 let setup_logs =
@@ -137,6 +139,10 @@ let setup_ocamlfind toolchain user's_directories =
     else Ok []
   in
   let directories = Result.value ~default:[] directories in
+  Log.debug (fun m ->
+      m "ocamlfind directories: @[<hov>%a@]"
+        Fmt.(list ~sep:(any ",@ ") Fpath.pp)
+        directories);
   List.rev_append directories user's_directories
 
 let toolchain =

@@ -33,16 +33,29 @@
 ;  (modules digest)
 ;  (libraries cmdliner args uniq.mod))
 
-(executable
- (name unique)
- (modules unique)
- (public_name uniq)
- (libraries compiler-libs.common uniq.solver uniq.cli))
+(library
+ (name unic_info)
+ (modules unic_info)
+ (public_name unic.info)
+ (libraries compiler-libs.common uniq.solver uniq.vendor unic.cli))
 
 (library
- (name uniq_cli)
- (modules uniq_cli)
- (public_name uniq.cli)
+ (name unic_infer)
+ (modules unic_infer)
+ (public_name unic.infer)
+ (libraries compiler-libs.common uniq.solver uniq.vendor unic.cli))
+
+(executable
+ (name unic)
+ (package unic)
+ (modules unic)
+ (public_name unic)
+ (libraries unic.infer unic.info))
+
+(library
+ (name unic_cli)
+ (modules unic_cli)
+ (public_name unic.cli)
  (wrapped false)
  (libraries
   compiler-libs.common

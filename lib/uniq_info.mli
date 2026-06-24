@@ -56,10 +56,17 @@ val modname : t -> Modname.t
 val equal : t -> t -> bool
 val intfs_imported : t -> (Modname.t * Digest.t option) list
 val impls_imported : t -> (Modname.t * Digest.t option) list
-val missing : t -> Modname.t list * Modname.t list
+
+val missing :
+  t -> (Modname.t * Digest.t option) list * (Modname.t * Digest.t option) list
 
 val qualify :
-  t -> ?location:Fpath.t -> ?crc:Digest.t -> [ `Intf | `Impl ] -> Modname.t -> t
+     t
+  -> ?location:Fpath.t
+  -> ?crc:Digest.t
+  -> [ `Intf | `Impl ]
+  -> Modname.t
+  -> t option
 
 val show : t Fmt.t
 val pp : t Fmt.t

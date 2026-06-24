@@ -73,6 +73,8 @@ let qualify_by_crc gamma =
         in
         let location = Info.location v in
         let t = Info.qualify t ~location ?crc k modname in
+        let t = Stdlib.Option.get t in
+        (* TODO(dinosaure): check that we re-qualify everything and upgrade correctly deps! *)
         (by_modname, t)
     | Some _v ->
         Logs.err (fun m -> m "%a => %a" Modname.pp modname Info.pp _v);
@@ -121,7 +123,7 @@ let qualify_objects gamma =
     | Some v, _ ->
         let location = Info.location v in
         let crc = Info.crc_of v modname in
-        (gamma, Info.qualify t ~location ?crc k modname)
+        (gamma, Info.qualify t ~location ?crc k modname |> Stdlib.Option.get)
     | None, Some vs ->
         let v = choose modname vs in
         let location = Info.location v in
@@ -131,7 +133,7 @@ let qualify_objects gamma =
           | `Intf -> (Modname.Map.add modname v (fst gamma), snd gamma)
           | `Impl -> (fst gamma, Modname.Map.add modname v (snd gamma))
         in
-        (gamma, Info.qualify t ~location ?crc k modname)
+        (gamma, Info.qualify t ~location ?crc k modname |> Stdlib.Option.get)
   in
   let is_none = Stdlib.Option.is_none in
   let fold (gamma, ts) t =
@@ -387,7 +389,7 @@ let with_resolver fn =
   match_with fn () { retc; exnc; effc }
 
 let qualify ?(stdlib = true) files =
-  let part location =
+  let fn0 location =
     OS.File.with_ic location @@ fun ic () ->
     match Misc.Magic_number.read_info ic with
     | Error _ -> Ok (Either.Right location)
@@ -395,16 +397,16 @@ let qualify ?(stdlib = true) files =
         let* v = Info.from_object location info ic in
         Ok (Either.Left v)
   in
-  let part loc = Result.join (part loc ()) |> failwith_error_msg in
-  let fn () =
-    let objects, sources = List.partition_map part files in
+  let fn0 loc = Result.join (fn0 loc ()) |> failwith_error_msg in
+  let fn1 () =
+    let objects, sources = List.partition_map fn0 files in
     let objects = qualify_objects objects in
     let cmis, _ = List.partition Info.is_a_cmi objects in
     let cmis = List.filter (Fun.negate is_stdlib) cmis in
     let sources = from_sources ~stdlib ~cmis sources in
     List.rev_append objects sources
   in
-  with_resolver fn
+  with_resolver fn1
 
 (* NOTE(dinosaure): Finally, we can qualify objects (what they need) regardless
    of whether it is a source file (managed by [codept]) or an artefact [*.cm*].

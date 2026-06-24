@@ -75,6 +75,8 @@ end = struct
   end)
 end
 
+[@@@warning "-32"]
+
 module RPath : sig
   type t
 
@@ -131,6 +133,16 @@ and 'a kind =
   | Cmxa : Cmx_format.library_infos kind
 
 and format = Format : 'a kind * 'a -> format
+
+let pp ppf t = Fmt.string ppf (Unitname.filepath t.name)
+
+let pp_elt ppf = function
+  | Qualified (modname, crc) ->
+      Fmt.pf ppf "%a(%a)" Modname.pp modname Uniq_digest.pp crc
+  | Fully_qualified (_, crc, path) ->
+      Fmt.pf ppf "%a(%a)" Fpath.pp path Uniq_digest.pp crc
+  | Located (_, path) -> Fpath.pp ppf path
+  | Named modname -> Modname.pp ppf modname
 
 let equal a b =
   String.equal (Unitname.filepath a.name) (Unitname.filepath b.name)
@@ -190,17 +202,34 @@ let impls_imported t = List.map of_elt t.impls
 let modname t = Unitname.modname t.name
 
 let missing t =
-  let intfs, _ =
-    List.partition_map
-      (function
-        | Named m | Qualified (m, _) -> Either.Left m | _ -> Either.Right ())
-      t.intfs
+  let fn = function
+    | Named m -> Either.Left (m, None)
+    | Qualified (m, crc) -> Either.Left (m, Some crc)
+    | _ -> Either.Right ()
   in
-  let impls, _ =
-    List.partition_map
-      (function
-        | Named m | Qualified (m, _) -> Either.Left m | _ -> Either.Right ())
-      t.impls
+  let intfs, _ = List.partition_map fn t.intfs in
+  let impls, _ = List.partition_map fn t.impls in
+  let fn1 modname crc (modname', crc') =
+    match (crc, crc') with
+    | None, None -> Modname.compare modname modname' = 0
+    | Some crc, Some crc' when Modname.compare modname modname' = 0 ->
+        if not (Digest.equal crc crc') then
+          raise (Inconsistency (t.name, modname, crc, crc'));
+        true
+    | Some _, Some _ -> false
+    | None, Some _ | Some _, None -> Modname.compare modname modname' = 0
+  in
+  let fn0 (modname, crc) = not (List.exists (fn1 modname crc) t.exports) in
+  let intfs =
+    match t.format with
+    | Format (Cmi, _) | Format (Mli, _) -> List.filter fn0 intfs
+    | _ -> intfs
+  in
+  let impls =
+    match t.format with
+    | Format (Cmo, _) | Format (Cma, _) | Format (Cmx, _) | Format (Cmxa, _) ->
+        List.filter fn0 impls
+    | _ -> impls
   in
   (intfs, impls)
 
@@ -223,16 +252,43 @@ let kind t =
 let elt_name = function
   | Qualified (x, _) | Fully_qualified (x, _, _) | Named x | Located (x, _) -> x
 
+exception Downgrade
+
 let elt_replace elt elts =
   List.fold_left
     (fun acc elt' ->
       let a = elt_name elt in
       let b = elt_name elt' in
-      if Modname.compare a b = 0 then elt :: acc else elt' :: acc)
+      if Modname.compare a b = 0 then
+        match (elt', elt) with
+        | Named _, _ -> elt :: acc
+        | Qualified _, Named _ -> raise Downgrade
+        | Fully_qualified _, Named _ -> raise Downgrade
+        | Located _, Named _ -> raise Downgrade
+        | Qualified (_, crc), Located (_, path) ->
+            Fully_qualified (a, crc, path) :: acc
+        | Qualified (_, crc), Fully_qualified (_, crc', _) ->
+            if Uniq_digest.equal crc crc' then elt :: acc else raise Downgrade
+        | Located _, Qualified _ -> assert false
+        | Located (_, path), Fully_qualified (_, _, path') ->
+            if Fpath.equal path path' then elt :: acc else raise Downgrade
+        | Fully_qualified (_, crc, _), Qualified (_, crc') ->
+            if Uniq_digest.equal crc crc' then elt' :: acc else raise Downgrade
+        | Fully_qualified _, Located _ -> raise Downgrade
+        | Qualified (_, crc), Qualified (_, crc') ->
+            if Uniq_digest.equal crc crc' then elt :: acc else raise Downgrade
+        | Fully_qualified (_, crc, path), Fully_qualified (_, crc', path') ->
+            if Uniq_digest.equal crc crc' && Fpath.equal path path' then
+              elt :: acc
+            else raise Downgrade
+        | Located (_, path), Located (_, path') ->
+            if Fpath.equal path path' then elt :: acc else raise Downgrade
+      else elt' :: acc)
     [] elts
   |> List.rev
 
 let qualify t ?location ?crc kind modname =
+  Log.debug (fun m -> m "requalify %a" pp t);
   let elt =
     match (location, crc) with
     | None, Some crc -> Qualified (modname, crc)
@@ -240,9 +296,11 @@ let qualify t ?location ?crc kind modname =
     | None, None -> Named modname
     | Some location, None -> Located (modname, location)
   in
-  match kind with
-  | `Intf -> { t with intfs= elt_replace elt t.intfs }
-  | `Impl -> { t with impls= elt_replace elt t.impls }
+  try
+    match kind with
+    | `Intf -> Some { t with intfs= elt_replace elt t.intfs }
+    | `Impl -> Some { t with impls= elt_replace elt t.impls }
+  with Downgrade -> None
 
 let elt_compare a b =
   let a = elt_name a in
@@ -274,9 +332,6 @@ let collect_modules_on_cmi { Cmi_format.cmi_sign; _ } =
   let rec on_signature_item ~prefix acc = function
     | Types.Sig_module (ident, _, { md_type; _ }, _, _) ->
         let modname = Modname.v (Ident.name ident) in
-        Log.debug (fun m ->
-            m "collect sub-module %a (prefix:%a)" Modname.pp modname RPath.pp
-              prefix);
         let prefix = RPath.extend ~modname prefix in
         begin match md_type with
         | Types.(Mty_ident _ | Mty_functor _ | Mty_alias _) ->
@@ -293,10 +348,7 @@ let collect_modules_on_cmi { Cmi_format.cmi_sign; _ } =
   in
   let fn acc sig_item = on_signature_item ~prefix:RPath.empty acc sig_item in
   let set = List.fold_left fn RPath.Set.empty cmi_sign in
-  let fn elt acc =
-    Log.debug (fun m -> m "add sub-module %a" Path.pp (RPath.to_path elt));
-    Path.Set.add (RPath.to_path elt) acc
-  in
+  let fn elt acc = Path.Set.add (RPath.to_path elt) acc in
   RPath.Set.fold fn set Path.Set.empty
 
 let info_of_cmi ~location ~version _ic =
@@ -419,8 +471,7 @@ let pp_dep ppf { Deps.path; edge; pkg; aliases } =
     (if edge = Deps.Edge.Normal then "" else "ε⋅")
     Namespaced.pp path Pkg.pp pkg Namespaced.Set.pp aliases
 
-let to_elt (intfs, impls) ({ Deps.path; pkg; _ } as dep) =
-  Log.debug (fun m -> m "=> elt: @[<hov>%a@]" pp_dep dep);
+let to_elt (intfs, impls) { Deps.path; pkg; _ } =
   let name = Namespaced.module_name path in
   match pkg.source with
   | Pkg.Pkg v ->
@@ -476,7 +527,8 @@ let from_source location =
       let name = Unitname.modulize (Fpath.to_string location) in
       let kind = if extension = "ml" then M2l.Structure else M2l.Signature in
       let version = None in
-      let exports = [ (Unitname.modname name, None) ] in
+      let modname = Unitname.modname name in
+      let exports = [ (modname, None) ] in
       match (Uniq_ml.run_into ~current [ basename ], kind) with
       | { Unit.mli= [ u ]; ml= [] }, M2l.Structure ->
           let intfs, impls =
@@ -484,8 +536,18 @@ let from_source location =
             |> List.fold_left to_elt ([], [])
           in
           let format = Format (Ml, u) in
+          (* TODO(dinosaure): I don't know what I should add on [modules]. For
+             my perspective, it's what the [*.ml] implements and we should look
+             into the [u.Unit.code] and see which modules we implements
+             ([module Foo = struct ... end]).
+
+             We can probably assert that what is missing for the same [*.cmx]
+             must be a superset of what is missing for the given [*.ml].
+
+             On the big perspective, we are mostly interested by what [codept]
+             gives to us on source files and then, we should only follow
+             [*.cmx{,a}]. *)
           let modules = Path.Set.empty in
-          (* TODO *)
           Ok { name; version; modules; exports; intfs; impls; format }
       | { Unit.mli= [ u ]; ml= [] }, M2l.Signature ->
           let intfs, impls =
@@ -493,8 +555,7 @@ let from_source location =
             |> List.fold_left to_elt ([], [])
           in
           let format = Format (Mli, u) in
-          let modules = Path.Set.empty in
-          (* TODO *)
+          let modules = collect_modules_on_mli ~modname u.Unit.code in
           Ok { name; version; modules; exports; intfs; impls; format }
       | { Unit.ml; mli }, _ ->
           Log.err (fun m -> m "ml: @[<hov>%a@]" Fmt.(Dump.list Unit.pp) ml);
@@ -542,7 +603,7 @@ let vs lst =
   in
   List.fold_left fn (Ok []) lst
 
-let dummy = String.make Digest.length '-'
+let dummy = String.make (Digest.length * 2) '-'
 
 let show_elt ppf = function
   | Qualified (name, crc) ->
@@ -610,4 +671,27 @@ let show ppf t =
     Fmt.pf ppf "Modules:\n%!";
     let modules = Path.Set.to_list t.modules in
     List.iter (Fmt.pf ppf "%a" show_module) modules
+  end;
+  let intfs, impls = missing t in
+  let pp_elt ppf = function
+    | modname, Some crc ->
+        Fmt.pf ppf "\t%a\t%a"
+          Fmt.(styled `Bold Digest.pp)
+          crc
+          Fmt.(styled `Blue Modname.pp)
+          modname
+    | modname, None ->
+        Fmt.pf ppf "\t%a\t%a"
+          Fmt.(styled `Bold string)
+          dummy
+          Fmt.(styled `Red Modname.pp)
+          modname
+  in
+  if intfs <> [] then begin
+    Fmt.pf ppf "Missing interfaces:\n%!";
+    Fmt.pf ppf "@[<hov>%a@]\n%!" Fmt.(list ~sep:(any "@.") pp_elt) intfs
+  end;
+  if impls <> [] then begin
+    Fmt.pf ppf "Missing implementations:\n%!";
+    Fmt.pf ppf "@[<hov>%a@]\n%!" Fmt.(list ~sep:(any ";@.") pp_elt) impls
   end

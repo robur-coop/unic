@@ -55,3 +55,10 @@
  (modules uniq_policy)
  (wrapped false)
  (libraries uniq.meta bcfgt))
+
+(library
+ (name uniq_vendor)
+ (public_name uniq.vendor)
+ (modules uniq_vendor)
+ (wrapped false)
+ (libraries uniq.solver))

@@ -72,6 +72,7 @@ end
 let missing_modules infos =
   let fn acc t =
     let intfs, impls = Info.missing t in
+    let intfs = List.map fst intfs and impls = List.map fst impls in
     let intfs = List.to_seq intfs and impls = List.to_seq impls in
     acc |> MSet.add_seq impls |> MSet.add_seq intfs
   in
@@ -256,12 +257,26 @@ let deps objs =
       let crc = Hashtbl.find_opt crcs modname in
       (modname, Option.join crc)
     in
+    let intfs = List.map fst intfs in
+    let impls = List.map fst impls in
     let deps0 = List.map fn intfs in
     let deps1 = List.rev_map fn impls in
     List.rev_append deps1 deps0
   in
   let fn1 (m, _crc) = (not (is_stdlib m)) && not (Hashtbl.mem self m) in
-  List.concat_map fn0 objs |> List.filter fn1
+  let deps = List.concat_map fn0 objs |> List.filter fn1 in
+  let pp_elt ppf (modname, crc) =
+    Fmt.pf ppf "%a(%a)" Modname.pp modname
+      Fmt.(option ~none:(any "<none>") Uniq_digest.pp)
+      crc
+  in
+  Logs.debug (fun m ->
+      m "dependencies for %a: @[<hov>%a@]"
+        Fmt.(list ~sep:(any ",") (using Info.modname Modname.pp))
+        objs
+        Fmt.(list ~sep:(any ";@ ") pp_elt)
+        deps);
+  deps
 
 type node = {
     dirpath: Fpath.t
@@ -358,6 +373,8 @@ let verify ~cfg g =
   in
   let fn1 info =
     let intfs, impls = Info.missing info in
+    let intfs = List.map fst intfs in
+    let impls = List.map fst impls in
     List.iter fn2 (intfs @ impls)
   in
   let fn0 _ node = List.iter fn1 node.objs in
@@ -418,3 +435,169 @@ let solve ~cfg ?(disambiguate = fail_on_ambiguity) dirs =
   let _state, g = solve ~cfg state ~resolve directs in
   let* () = verify ~cfg g in
   Ok g
+
+module Ng = struct
+  type cfg = {
+      stdlib: bool
+    ; recurse: bool
+    ; exclude: Fpath.t list
+    ; forbid: MSet.t
+  }
+
+  let config ?(stdlib = true) ?(recurse = true) ?(exclude = []) ?(forbid = [])
+      () =
+    let forbid = MSet.of_list forbid in
+    { stdlib; recurse; exclude; forbid }
+
+  type providers = ?crc:Digest.t -> Modname.t -> Info.t option
+
+  let absolute =
+    (* NOTE(dinosaure): [Fpath.v] should be fine! *)
+    let cwd = Fpath.v (Sys.getcwd ()) in
+    fun path ->
+      let path = if Fpath.is_rel path then Fpath.(cwd // path) else path in
+      Fpath.normalize path
+
+  exception
+    Impossible_to_requalify of
+      Info.t * Fpath.t * Digest.t option * [ `Intf | `Impl ] * Modname.t
+
+  (* NOTE(dinosaure): we try to solve missing modules from what we already have.
+     For instance, a [*.ml] can requires [x509] but we also have [x509.cmi] as
+     an artifact into our [infos]:
+     - [x509.cmi] ∈ [infos]
+     - & [(X509, _)] ∈ [modules] => one of our artifacts requires [X509]
+
+     In that case, that mostly means that one of our [infos] artifact told to us
+     that it requires [X509] (see [missing_intfs]). Here, we will try to
+     consolidate our [infos] and requalify some of our artifacts with our
+     [x509.cmi] instead of asking the caller a new provider for [X509].
+
+     It take into account only [exports] modules! The objective here is to
+     qualify dependencies on our [info] with [Fully_qualified]. About [Located],
+     it must be done in another pass when we can not any find solutions from
+     what [*.cmi]/[*.mli] exports. *)
+  let prune infos modules =
+    let fn0 (m, crc) (p, crc') =
+      match (crc, crc') with
+      | Some crc, Some crc' when Digest.equal crc crc' ->
+          let part = Info.Path.singleton m in
+          Info.Path.is_a_part ~part p
+      | Some _, Some _ -> false
+      | Some _, None -> false
+      | None, Some _ | None, None ->
+          let part = Info.Path.singleton m in
+          Info.Path.is_a_part ~part p
+    in
+    let fn1 (m, crc) info =
+      let exports = Info.exports info in
+      let found = List.exists (fn0 (m, crc)) exports in
+      if found then Some info else None
+    in
+    let fn0 (infos, progress, rem) (m, crc) =
+      match List.filter_map (fn1 (m, crc)) infos with
+      | [ solution ] ->
+          Log.debug (fun mf ->
+              mf "take %a for %a" Info.pp solution Modname.pp m);
+          let location = Info.location solution in
+          let fn info =
+            match Info.qualify info ~location ?crc `Intf m with
+            | Some info -> info
+            | None ->
+                raise (Impossible_to_requalify (info, location, crc, `Intf, m))
+          in
+          let infos = List.map fn infos in
+          (infos, true, rem)
+      | _ :: _ as solutions ->
+          Log.err (fun mf ->
+              mf "Multiple solutions for %a (%a)" Modname.pp m
+                Fmt.(option ~none:(any "<none>") Uniq_digest.pp)
+                crc);
+          Log.err (fun m ->
+              m "Actual artifacts: @[<hov>%a@]"
+                Fmt.(list ~sep:(any ",@ ") Info.pp)
+                infos);
+          Log.err (fun m ->
+              m "Solutions: @[<hov>%a@]"
+                Fmt.(list ~sep:(any ",@ ") Info.pp)
+                solutions);
+          assert false
+      | [] -> (infos, progress, (m, crc) :: rem)
+    in
+    let rec go infos modules =
+      let infos, progress, modules =
+        List.fold_left fn0 (infos, false, []) modules
+      in
+      if progress then go infos modules else (infos, modules)
+    in
+    go infos modules
+
+  let missing_intfs infos =
+    List.concat_map (fun info -> fst (Info.missing info)) infos
+
+  let not_in_forbidden_modules cfg modules =
+    if List.exists (fun (m, _) -> MSet.mem m cfg.forbid) modules = false then
+      Ok ()
+    else error_msgf "Foo"
+
+  let sort = List.sort_uniq (fun (a, _) (b, _) -> Modname.compare a b)
+  let dummy = String.make (Uniq_digest.length * 2) '-'
+
+  let solve_intfs ~cfg:({ recurse; exclude; stdlib; _ } as cfg) ~providers dirs
+      =
+    let ( let* ) = Result.bind in
+    let fn = Uniq_resolve.Src.sources ~recurse ~exclude in
+    let dirs = List.map absolute dirs in
+    let dirs = List.map Fpath.to_dir_path dirs in
+    let srcs = List.map fn dirs in
+    let fn (infos, progress, rem) (m, crc) =
+      Log.debug (fun mf ->
+          mf "ask for %a (%a)" Modname.pp m
+            Fmt.(option ~none:(const (fmt "%s") dummy) Uniq_digest.pp)
+            crc);
+      begin match providers ?crc m with
+      | None -> (infos, progress, (m, crc) :: rem)
+      | Some solution when List.exists (Info.equal solution) infos = false ->
+          let location = Info.location solution in
+          (* NOTE(dinosaure): here, [crc] is still the one from what it miss
+             but, with the solution, we can actually fix it with what [solution]
+             gives to us. We can observe some requalification from [Location] to
+             [Fully_qualified] which is fine but I suspect an override of the
+             [crc] sometimes... *)
+          let fn info =
+            match Info.qualify info ~location ?crc `Intf m with
+            | Some info -> info
+            | None ->
+                raise (Impossible_to_requalify (info, location, crc, `Intf, m))
+          in
+          let infos = List.map fn infos in
+          Log.debug (fun m -> m "add %a" Info.pp solution);
+          (solution :: infos, true, rem)
+      | Some _solution -> assert false
+      end
+    in
+    let rec go infos =
+      match missing_intfs infos |> sort with
+      | [] -> Ok (infos, [])
+      | modules ->
+          Log.debug (fun m ->
+              m "search (00): @[<hov>%a@]"
+                Fmt.(list ~sep:(any ",@ ") Modname.pp)
+                (List.map fst modules));
+          let* () = not_in_forbidden_modules cfg modules in
+          let infos, modules = prune infos modules in
+          let modules = sort modules in
+          Log.debug (fun m ->
+              m "search (01): @[<hov>%a@]"
+                Fmt.(list ~sep:(any ",@ ") Modname.pp)
+                (List.map fst modules));
+          let infos, progress, modules =
+            match modules with
+            | [] -> (infos, true, [])
+            | modules -> List.fold_left fn (infos, false, []) modules
+          in
+          if progress then go infos else Ok (infos, modules)
+    in
+    let* infos = Uniq_resolve.qualify ~stdlib srcs in
+    go infos
+end

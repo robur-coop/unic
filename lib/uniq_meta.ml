@@ -285,7 +285,7 @@ let relativize ~roots path =
 
 let search ~roots ?(predicates = [ "native"; "byte" ]) meta_path =
   let ( >>= ) = Result.bind in
-  let ( >>| ) x f = Result.map f x in
+  let ( >>| ) x fn = Result.map fn x in
   let elements path =
     if Sys.is_directory (Fpath.to_string path) then Ok false
     else if Fpath.basename path = "META" then Ok true
@@ -439,7 +439,7 @@ module MSet = Set.Make (Modname)
 let submodules path =
   let cmi = Cmi_format.read_cmi path in
   let fn = function
-    | Types.Sig_module (name, _, _, _, _) -> Some (Ident.name name)
+    | Types.Sig_module (name, _, _, _, _) -> Some (Modname.v (Ident.name name))
     | _ -> None
   in
   match List.filter_map fn cmi.cmi_sign with
@@ -477,16 +477,11 @@ let register_if_target targets full modname acc =
     Modname.Map.update modname fn acc
   else acc
 
-(* Scan the .cmi files inside [dname] and register every top-level module
-   whose name belongs to [targets].  When [and_submodules] is true, also
-   open each .cmi to discover sub-modules (e.g. [Cmdliner] exports [Cmd],
+(* Scan the [*.cmi] files inside [dname] and register every top-level module
+   whose name belongs to [targets]. When [and_submodules] is true, also
+   open each [*.cmi] to discover sub-modules (e.g. [Cmdliner] exports [Cmd],
    [Term]). *)
 
-(* TODO(dinosaure): we have a bug with [x509] and a third (sub)module:
-   [X509.Distinguished_name.Relative_distinguished_name]. When we do a
-   double-opne (for [X509] and [Distinguished_name]), [codept] tries to
-   search a [Relative_distinguished_name] which is not defined. [x509]
-   misses its [x509__Distinguished_name.cmi]... *)
 let scan_cmis ~and_submodules ~targets ~full ~dname acc =
   if Sys.file_exists dname && Sys.is_directory dname then
     let files = Sys.readdir dname in
@@ -497,10 +492,7 @@ let scan_cmis ~and_submodules ~targets ~full ~dname acc =
         let acc = register_if_target targets full modname acc in
         if and_submodules then
           let subs = submodules (Filename.concat dname fname) in
-          let fn acc name =
-            let m = Modname.v (String.capitalize_ascii name) in
-            register_if_target targets full m acc
-          in
+          let fn acc modname = register_if_target targets full modname acc in
           List.fold_left fn acc subs
         else acc
       else acc
@@ -509,11 +501,13 @@ let scan_cmis ~and_submodules ~targets ~full ~dname acc =
   else acc
 
 let with_a_cmi filepath =
+  (* TODO(dinosaure): be more restrictive and also check the current [META] to
+     see if we can manipulate the given [*.mli]. *)
   let filepath = Fpath.set_ext "cmi" filepath in
   let filepath = Fpath.to_string filepath in
   Sys.file_exists filepath && Sys.is_regular_file filepath
 
-let scan_mlis ~and_submodules:_ ~targets ~full ~dname acc =
+let scan_mlis ~targets ~full ~dname acc =
   if Sys.file_exists dname && Sys.is_directory dname then
     let files = Sys.readdir dname in
     let fn acc fname =
@@ -593,7 +587,7 @@ let walk_meta_files ~roots ~predicates ~and_submodules ?(intf = `Cmi) ~targets
           if has_archive descr && owns_dir then
             match intf with
             | `Cmi -> scan_cmis ~and_submodules ~targets ~full ~dname acc
-            | `Mli -> scan_mlis ~and_submodules ~targets ~full ~dname acc
+            | `Mli -> scan_mlis ~targets ~full ~dname acc
           else acc
         in
         List.fold_left fn acc (subpaths m)
