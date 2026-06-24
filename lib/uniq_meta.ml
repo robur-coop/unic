@@ -410,13 +410,15 @@ let to_artifacts pkgs =
           | None -> Ok path
         in
         let directory = Fpath.to_dir_path directory in
-        (* We only keep [.cma]/[.cmxa] archives: plugins ([.cmxs]) are not
-           readable as OCaml objects and carry no extra information for us. *)
+        (* We keep the linkable OCaml objects: archives ([.cma]/[.cmxa]) and
+           standalone units ([.cmo]/[.cmx]) that single-module packages ship
+           directly. Plugins ([.cmxs]) are not readable as OCaml objects and
+           carry no extra information for us. *)
         let archive = List.assoc_opt "archive" pkg in
         let archive = Stdlib.Option.value ~default:[] archive in
         let keep a =
           match Filename.extension a with
-          | ".cma" | ".cmxa" -> true
+          | ".cma" | ".cmxa" | ".cmo" | ".cmx" -> true
           | _ -> false
         in
         let archive = List.filter keep archive in
@@ -756,3 +758,16 @@ let from_cmi_to_impl ~roots ~packages:candidates ?stdlib filepath =
         match List.filter owns candidates with
         | pkg :: _ -> Ok (Some (pick pkg))
         | [] -> Ok None)
+
+let archives_of ~roots ?(predicates = [ "native"; "byte" ]) = function
+  | Stdlib dirpath ->
+      let dirpath = absolute (Fpath.to_dir_path dirpath) in
+      let name =
+        if List.mem "native" predicates then "stdlib.cmxa" else "stdlib.cma"
+      in
+      let path = Fpath.(dirpath / name) in
+      if Sys.file_exists (Fpath.to_string path) then Uniq_info.vs [ path ]
+      else Ok []
+  | Library (pkg, _, _) ->
+      let* descrs = search ~roots ~predicates pkg in
+      to_artifacts descrs

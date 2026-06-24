@@ -68,6 +68,12 @@ val from_cmi_to_impl :
     is associated with the synthetic [stdlib] package, since the standard
     library ships no [META] file. *)
 
+val archives_of :
+     roots:Fpath.t list
+  -> ?predicates:string list
+  -> archive
+  -> (Uniq_info.t list, [> `Msg of string ]) result
+
 (**/*)
 
 val ancestors :

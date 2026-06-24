@@ -80,6 +80,14 @@ let pp_module ppf (modname, crc) =
   | Some crc -> Fmt.pf ppf "%a(%a)" Modname.pp modname Uniq_digest.pp crc
   | None -> Modname.pp ppf modname
 
+module Archive = struct
+  type t = Meta.archive
+
+  let compare = Stdlib.compare
+end
+
+module ASet = Set.Make (Archive)
+
 let run _quiet cfg0 cfg1 dirs =
   let ( let* ) = Result.bind in
   let stdlib =
@@ -87,6 +95,14 @@ let run _quiet cfg0 cfg1 dirs =
     | Some cfg -> Uniq_cfg.get cfg ~key:"standard_library" Uniq_cfg.Value.path
     | None -> None
   in
+  let native =
+    match cfg0 with
+    | Some (where, _) ->
+        let base = Fpath.basename (where :> Fpath.t) in
+        not (String.length base >= 6 && String.sub base 0 6 = "ocamlc")
+    | None -> true
+  in
+  let predicates = if native then [ "native" ] else [ "byte" ] in
   let cfg =
     Uniq_solver.Ng.config ~stdlib:cfg1.Solver.Config.stdlib
       ~recurse:cfg1.Solver.Config.recurse ~exclude:cfg1.Solver.Config.exclude
@@ -95,8 +111,6 @@ let run _quiet cfg0 cfg1 dirs =
   in
   let roots = cfg1.Solver.Config.roots in
   let* gamma = search_cmis ~roots in
-  Logs.debug (fun m ->
-      m "roots: @[<hov>%a@]" Fmt.(list ~sep:(any ";@ ") Fpath.pp) roots);
   let providers ?crc modname =
     let fn _filepath info =
       let exports = info.Uniq_info.exports in
@@ -129,10 +143,10 @@ let run _quiet cfg0 cfg1 dirs =
             m "@[<hov>%a@]" Fmt.(list ~sep:(any ",@ ") Info.pp) solutions);
         assert false
   in
-  let* infos, _private_modules = Solver.Ng.solve_intfs ~cfg ~providers dirs in
-  let cmis = List.filter Uniq_info.is_a_cmi infos in
+  let* infos, private_modules = Solver.Ng.solve_intfs ~cfg ~providers dirs in
+  let intfs = List.filter Uniq_info.is_a_cmi infos in
   let pkgs = Meta.packages_with_archive roots in
-  let* assoc =
+  let* descrs =
     let fn acc info =
       let* acc = acc in
       let* pkg =
@@ -141,17 +155,59 @@ let run _quiet cfg0 cfg1 dirs =
       in
       Ok ((info, pkg) :: acc)
     in
-    List.fold_left fn (Ok []) cmis
+    List.fold_left fn (Ok []) intfs
   in
-  List.iter
-    (fun (info, pkg) ->
-      match pkg with
-      | Some (Meta.Library (path, _, _)) ->
-          Fmt.pr "  %a => %a\n%!" Info.pp info Meta.Path.pp path
-      | Some (Meta.Stdlib _) -> Fmt.pr "  %a (stdlib)\n%!" Info.pp info
-      | None ->
-          Fmt.pr "  %a => %a\n%!" Info.pp info Fmt.(styled `Red string) "<none>")
-    (List.rev assoc);
+  let archives =
+    let fn acc (_, pkg) =
+      let none = acc and some a = ASet.add a acc in
+      Stdlib.Option.fold ~none ~some pkg
+    in
+    List.fold_left fn ASet.empty descrs |> ASet.elements
+  in
+  let* impls =
+    let fn acc archive =
+      let* acc = acc in
+      let* infos = Meta.archives_of ~roots ~predicates archive in
+      Ok (List.rev_append infos acc)
+    in
+    List.fold_left fn (Ok []) archives
+  in
+  let provided (modname, crc) =
+    let in_info info =
+      let exists =
+        let fn (path, _) =
+          match Uniq_info.Path.to_list path with
+          | [ m ] -> Modname.compare m modname = 0
+          | _ -> false
+        in
+        List.exists fn (Uniq_info.exports info)
+      in
+      let matches =
+        match crc with
+        | None -> true
+        | Some crc ->
+            let check = Uniq_digest.equal crc in
+            let fn (m, c) =
+              Modname.compare m modname = 0
+              && Stdlib.Option.(map check c |> value ~default:true)
+            in
+            List.exists fn (Uniq_info.intfs_imported info)
+      in
+      exists && matches
+    in
+    List.exists in_info impls
+  in
+  let unresolved = List.filter (Fun.negate provided) private_modules in
+  Fmt.pr
+    ">>> Static-link graph (%s), %d interface(s) + %d implementation(s):\n%!"
+    (if native then "native" else "bytecode")
+    (List.length intfs) (List.length impls);
+  List.iter (fun info -> Fmt.pr "  %a\n%!" Info.pp info) impls;
+  if unresolved <> [] then begin
+    Fmt.pr ">>> Unresolved private modules: @[<hov>%a@]\n%!"
+      Fmt.(list ~sep:(any ",@ ") pp_module)
+      unresolved
+  end;
   Ok ()
 
 let run _quiet _cfg0 cfg1 dirs =
