@@ -6,6 +6,7 @@ module Info = Uniq_info
 module Digest = Uniq_digest
 
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
+let somef fmt = Fmt.kstr Stdlib.Option.some fmt
 
 type cfg = {
     stdlib: bool
@@ -35,6 +36,17 @@ let absolute =
     Fpath.normalize path
 
 exception Multiple_solutions of Modname.t * Digest.t option * Info.t list
+
+let () =
+  let dummy = String.make (Digest.length * 2) '-' in
+  Printexc.register_printer @@ function
+  | Multiple_solutions (modname, crc, infos) ->
+      somef "Multiple solutions for %a (%a): @[<hov>%a@]" Modname.pp modname
+        Fmt.(option ~none:(const string dummy) Digest.pp)
+        crc
+        Fmt.(list ~sep:(any ";@ ") Info.pp)
+        infos
+  | _ -> None
 
 (* NOTE(dinosaure): The purpose of this function is to reclassify
    dependencies based on what has just been injected. For example, adding
