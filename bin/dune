@@ -48,6 +48,7 @@
   uniq.cfg
   uniq.solver
   uniq.clos
+  uniq.policy
   uniq.vendor
   unic.cli))
 

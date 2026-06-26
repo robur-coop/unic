@@ -50,7 +50,7 @@ val from_cmi_to_impl :
      roots:Fpath.t list
   -> packages:package list
   -> ?stdlib:Fpath.t
-  -> ?ambiguity:(Modname.t -> Path.t list -> Path.t)
+  -> ?disambiguate:(Modname.t -> Path.t list -> Path.t)
   -> Fpath.t
   -> (archive option, [> `Msg of string ]) result
 (** [from_cmi_to_impl ~roots cmi] associates the given [cmi] artifact with the

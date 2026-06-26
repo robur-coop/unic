@@ -18,6 +18,11 @@ type t = { prefers: Path.Set.t; overrides: path Modname.Map.t }
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
 let empty = { prefers= Path.Set.empty; overrides= Modname.Map.empty }
 
+let use t modname pkg =
+  { t with overrides= Modname.Map.add modname pkg t.overrides }
+
+let prefer t pkg = { t with prefers= Path.Set.add pkg t.prefers }
+
 let path =
   let dec = Path.of_string_exn and enc = Fmt.to_to_string Path.pp in
   Bcfgt.map ~dec ~enc Bcfgt.string
@@ -57,4 +62,4 @@ let disambiguate_with t modname candidates =
   | Some pkg -> List.find_opt (Path.equal pkg) candidates
   | None ->
       let fn pkg = List.exists (Path.equal pkg) candidates in
-      Path.Set.find_first_opt fn t.prefers
+      List.find_opt fn (Path.Set.elements t.prefers)

@@ -3,6 +3,7 @@ module Info = Uniq_info
 module Solver = Uniq_solver
 module Clos = Uniq_clos
 module Vendor = Uniq_vendor
+module Option = Stdlib.Option
 
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
 
@@ -50,12 +51,50 @@ let prefer_stdlib ?stdlib solutions =
         Fpath.equal dir Fpath.(normalize (to_dir_path (parent where)))
       in
       List.find_opt in_stdlib solutions
-      |> Stdlib.Option.value ~default:(List.hd solutions)
+      |> Option.value ~default:(List.hd solutions)
 
-let run _quiet cfg0 roots cfg1 dirs =
+let run _quiet cfg0 roots cfg1 policy dirs =
   let ( let* ) = Result.bind in
   let* env = Uniq_clos.env ?cfg:cfg0 roots in
   let stdlib = Uniq_clos.stdlib env in
+  let packages = Meta.packages_with_archive roots in
+  let disambiguate_on_packages =
+    let memo = Hashtbl.create 0x7ff in
+    fun modname paths ->
+      match Uniq_policy.disambiguate_with policy modname paths with
+      | Some pkg -> pkg
+      | None -> (
+          match Hashtbl.find_opt memo modname with
+          | Some pkg -> pkg
+          | None ->
+              let pkg = prompt modname paths in
+              Hashtbl.replace memo modname pkg;
+              pkg)
+  in
+  let package_of info =
+    match
+      Meta.from_cmi_to_impl ~roots ~packages ?stdlib
+        ~disambiguate:disambiguate_on_packages (Uniq_info.location info)
+    with
+    | Ok (Some (Meta.Library (path, _, _))) -> Some path
+    | Ok (Some (Meta.Stdlib _)) | Ok None | Error _ -> None
+  in
+  let disambiguate_on_modules modname solutions =
+    let with_packages =
+      let fn info = Option.map (fun pkg -> (pkg, info)) (package_of info) in
+      List.filter_map fn solutions
+    in
+    match with_packages with
+    | [] -> raise (Ambiguous_interface (modname, solutions))
+    | _ -> begin
+        let pkgs = List.map fst with_packages in
+        let chosen = disambiguate_on_packages modname pkgs in
+        let fn (pkg, _) = Meta.Path.equal pkg chosen in
+        match List.find_opt fn with_packages with
+        | Some (_, info) -> info
+        | None -> raise (Ambiguous_interface (modname, solutions))
+      end
+  in
   let providers ?crc modname =
     let fn _filepath info =
       let exports = info.Uniq_info.exports in
@@ -82,26 +121,23 @@ let run _quiet cfg0 roots cfg1 dirs =
            configuration even though we can choose any of the options without a
            doubt! *)
         Some (prefer_stdlib ?stdlib solutions)
-    | _ :: _ as solutions -> raise (Ambiguous_interface (modname, solutions))
+    | _ :: _ as solutions -> Some (disambiguate_on_modules modname solutions)
   in
-  let* infos, _private_modules = Solver.solve_intfs ~cfg:cfg1 ~providers dirs in
-  let ambiguity =
-    let memo = Hashtbl.create 0x7ff in
-    fun modname paths ->
-      match Hashtbl.find_opt memo modname with
-      | Some pkg -> pkg
-      | None ->
-          let pkg = prompt modname paths in
-          Hashtbl.replace memo modname pkg;
-          pkg
+  let* infos, _private_modules =
+    Solver.solve_intfs ~cfg:cfg1 ~providers
+      ~disambiguate:disambiguate_on_modules dirs
   in
-  let* intf_holes, impl_holes = Clos.verify ~env ~ambiguity infos in
+  let* intf_holes, impl_holes =
+    Clos.verify ~env ~disambiguate:disambiguate_on_packages infos
+  in
   let fn (m, _) = Solver.to_ignore ~cfg:cfg1 m in
   let intf_holes = List.filter (Fun.negate fn) intf_holes
   and impl_holes = List.filter (Fun.negate fn) impl_holes in
   match (intf_holes, impl_holes) with
   | [], [] ->
-      let* impls = Clos.impls ~env ~ambiguity infos in
+      let* impls =
+        Clos.impls ~env ~disambiguate:disambiguate_on_packages infos
+      in
       let infos = Vendor.color impls in
       Fmt.pr "@[<hov>%a@]\n%!" Fmt.(list ~sep:(any ";@ ") Info.pp) infos;
       Ok ()
@@ -119,9 +155,9 @@ let run _quiet cfg0 roots cfg1 dirs =
         (pp_section "missing implementations")
         impl_holes
 
-let run quiet cfg0 roots cfg1 dirs =
+let run quiet cfg0 roots cfg1 policy dirs =
   let result =
-    try run quiet cfg0 roots cfg1 dirs with
+    try run quiet cfg0 roots cfg1 policy dirs with
     | Ambiguous_interface (modname, solutions) ->
         error_msgf
           "@[<v>%a is provided by several incompatible interfaces:@,%a@]"
@@ -191,7 +227,13 @@ let setup_solver =
 
 let term =
   let open Term in
-  const run $ setup_logs $ setup_ocaml $ setup_ocamlfind $ setup_solver $ dirs
+  const run
+  $ setup_logs
+  $ setup_ocaml
+  $ setup_ocamlfind
+  $ setup_solver
+  $ setup_policy
+  $ dirs
 
 let cmd =
   let doc = "Infer the opam package an OCaml project should vendor." in

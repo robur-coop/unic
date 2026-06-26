@@ -212,18 +212,50 @@ let path =
   in
   Arg.conv (parser, Fpath.pp)
 
-let setup_policy = function
-  | None -> Uniq_policy.empty
-  | Some filepath ->
-      let policy = Uniq_policy.load filepath in
-      let fn _ =
-        Log.warn (fun m ->
-            m "Invalid configuration file (you can validate it with %a): %a"
-              Fmt.(styled `Bold string)
-              "bcfg validate" Fpath.pp filepath)
-      in
-      Result.iter_error fn policy;
-      Result.value ~default:Uniq_policy.empty policy
+type preference =
+  | Use of Modname.t * Uniq_meta.Path.t
+  | Prefer of Uniq_meta.Path.t
+
+let preference =
+  let parser str =
+    let ( let* ) = Result.bind in
+    match String.index_opt str ':' with
+    | Some i ->
+        let m = String.sub str 0 i in
+        let p = String.sub str (succ i) (String.length str - succ i) in
+        let* m = Modname.of_string m in
+        let* p = Uniq_meta.Path.of_string p in
+        Ok (Use (m, p))
+    | None ->
+        let* p = Uniq_meta.Path.of_string str in
+        Ok (Prefer p)
+  in
+  let pp ppf = function
+    | Use (m, p) -> Fmt.pf ppf "%a:%a" Modname.pp m Uniq_meta.Path.pp p
+    | Prefer p -> Uniq_meta.Path.pp ppf p
+  in
+  Arg.conv (parser, pp)
+
+let apply t = function
+  | Use (m, p) -> Uniq_policy.use t m p
+  | Prefer p -> Uniq_policy.prefer t p
+
+let setup_policy filepath preferences =
+  let policy =
+    match filepath with
+    | None -> Uniq_policy.empty
+    | Some filepath ->
+        let policy = Uniq_policy.load filepath in
+        let fn _ =
+          Log.warn (fun m ->
+              m "Invalid configuration file (you can validate it with %a): %a"
+                Fmt.(styled `Bold string)
+                "bcfg validate" Fpath.pp filepath)
+        in
+        Result.iter_error fn policy;
+        Result.value ~default:Uniq_policy.empty policy
+  in
+  List.fold_left apply policy (List.concat preferences)
 
 let configuration =
   let doc = "A $(b,bcfg) policy file to disambiguate package choices." in
@@ -232,4 +264,16 @@ let configuration =
   & opt (some existing_filepath) None
   & info [ "c"; "config" ] ~doc ~docv:"FILE"
 
-let setup_policy = Term.(const setup_policy $ configuration)
+let preferences =
+  let doc =
+    "Prefer an ocamlfind package to provide a module when several do: \
+     $(b,MODULE:PACKAGE) for a given module (e.g. $(b,Term:cmdliner)), or just \
+     $(b,PACKAGE) as a global preference. Repeatable or comma-separated, and \
+     applied on top of the policy file ($(b,--config))."
+  in
+  let open Arg in
+  value
+  & opt_all (list preference) []
+  & info [ "prefer" ] ~doc ~docv:"[MODULE:]PACKAGE"
+
+let setup_policy = Term.(const setup_policy $ configuration $ preferences)

@@ -2,7 +2,7 @@ module Info = Uniq_info
 module Meta = Uniq_meta
 
 type env
-type ambiguity = Modname.t -> Meta.Path.t list -> Meta.Path.t
+type disambiguate = Modname.t -> Meta.Path.t list -> Meta.Path.t
 type intf = Modname.t * Info.t
 type impl = Modname.t * Info.t
 
@@ -12,12 +12,12 @@ val stdlib : env -> Fpath.t option
 
 val impls :
      env:env
-  -> ambiguity:ambiguity
+  -> disambiguate:disambiguate
   -> Info.t list
   -> (Info.t list, [> `Msg of string ]) result
 
 val verify :
      env:env
-  -> ambiguity:ambiguity
+  -> disambiguate:disambiguate
   -> Info.t list
   -> (intf list * impl list, [> `Msg of string ]) result

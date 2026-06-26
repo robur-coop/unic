@@ -27,6 +27,7 @@ let config ?(stdlib = true) ?(recurse = true) ?(exclude = []) ?(ignore = [])
 let to_ignore ~cfg modname = MSet.mem modname cfg.ignore
 
 type providers = ?crc:Digest.t -> Modname.t -> Info.t option
+type disambiguate = Modname.t -> Info.t list -> Info.t
 
 let absolute =
   (* NOTE(dinosaure): [Fpath.v] should be fine! *)
@@ -52,7 +53,7 @@ let () =
    dependencies based on what has just been injected. For example, adding
    [cmdliner.cmi] means that the [Cmd] module and the [Term] module can be
    resolved without requiring any further information. *)
-let prune infos modules =
+let prune ?disambiguate infos modules =
   let fn0 (m, crc) (p, crc') =
     match (crc, crc') with
     | Some crc, Some crc' when Digest.equal crc crc' ->
@@ -69,15 +70,22 @@ let prune infos modules =
     let found = List.exists (fn0 (m, crc)) exports in
     if found then Some info else None
   in
+  let take (infos, _, rem) crc m solution =
+    Log.debug (fun mf -> mf "take %a for %a" Info.pp solution Modname.pp m);
+    let location = Info.location solution in
+    let fn info = Info.qualify info ~location ?crc `Intf m in
+    (List.map fn infos, true, rem)
+  in
   let fn0 (infos, progress, rem) (m, crc) =
     match List.filter_map (fn1 (m, crc)) infos with
-    | [ solution ] ->
-        Log.debug (fun mf -> mf "take %a for %a" Info.pp solution Modname.pp m);
-        let location = Info.location solution in
-        let fn info = Info.qualify info ~location ?crc `Intf m in
-        let infos = List.map fn infos in
-        (infos, true, rem)
-    | _ :: _ as solutions -> raise (Multiple_solutions (m, crc, solutions))
+    | [ solution ] -> take (infos, progress, rem) crc m solution
+    | _ :: _ as solutions -> (
+        (* The same module is exported by several collected interfaces (e.g.
+           [Term] by both [cmdliner] and [mnotty]): defer to [disambiguate]
+           when the caller provides one, otherwise report the ambiguity. *)
+        match disambiguate with
+        | Some choose -> take (infos, progress, rem) crc m (choose m solutions)
+        | None -> raise (Multiple_solutions (m, crc, solutions)))
     | [] -> (infos, progress, (m, crc) :: rem)
   in
   let rec go infos modules =
@@ -101,7 +109,8 @@ let not_in_forbidden_modules cfg modules =
 
 let sort = List.sort_uniq (fun (a, _) (b, _) -> Modname.compare a b)
 
-let solve_intfs ~cfg:({ recurse; exclude; stdlib; _ } as cfg) ~providers dirs =
+let solve_intfs ?disambiguate ~cfg:({ recurse; exclude; stdlib; _ } as cfg)
+    ~providers dirs =
   let ( let* ) = Result.bind in
   let fn = Uniq_resolve.Src.sources ~recurse ~exclude in
   let dirs = List.map absolute dirs in
@@ -133,7 +142,7 @@ let solve_intfs ~cfg:({ recurse; exclude; stdlib; _ } as cfg) ~providers dirs =
     | [] -> Ok (infos, [])
     | modules ->
         let* () = not_in_forbidden_modules cfg modules in
-        let infos, modules = prune infos modules in
+        let infos, modules = prune ?disambiguate infos modules in
         let modules = sort modules in
         let infos, progress, modules =
           match modules with

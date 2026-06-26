@@ -721,7 +721,7 @@ let stdlib_package dir =
   Stdlib dirpath
 
 let from_cmi_to_impl ~roots ~packages:candidates ?stdlib
-    ?(ambiguity = fun _ paths -> List.hd paths) filepath =
+    ?(disambiguate = fun _ paths -> List.hd paths) filepath =
   if Fpath.mem_ext [ ".cmi" ] filepath = false then
     invalid_arg "You must give a *.cmi file";
   if List.exists (fun root -> Fpath.is_rooted ~root filepath) roots = false then
@@ -780,7 +780,7 @@ let from_cmi_to_impl ~roots ~packages:candidates ?stdlib
           | [ pkg ] -> Some pkg
           | _ :: _ as several -> (
               let chosen =
-                ambiguity modname (List.map (fun p -> p.pkg) several)
+                disambiguate modname (List.map (fun p -> p.pkg) several)
               in
               match
                 List.find_opt (fun p -> Path.equal p.pkg chosen) several

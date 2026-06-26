@@ -68,7 +68,7 @@
  (public_name uniq.policy)
  (modules uniq_policy)
  (wrapped false)
- (libraries uniq.meta bcfgt))
+ (libraries uniq.meta bcfgt cmdliner))
 
 ; (library
 ;  (name uniq_vendor)

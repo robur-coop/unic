@@ -18,7 +18,7 @@ type env = {
   ; pkgs: Meta.package list
 }
 
-type ambiguity = Modname.t -> Meta.Path.t list -> Meta.Path.t
+type disambiguate = Modname.t -> Meta.Path.t list -> Meta.Path.t
 type intf = Modname.t * Info.t
 type impl = Modname.t * Info.t
 
@@ -143,7 +143,7 @@ let prefer_stdlib ?stdlib solutions =
       List.find_opt in_stdlib solutions
       |> Stdlib.Option.value ~default:(List.hd solutions)
 
-let resolve ~env:{ stdlib; predicates; gamma; roots; pkgs } ~ambiguity
+let resolve ~env:{ stdlib; predicates; gamma; roots; pkgs } ~disambiguate
     (modname, crc) =
   let ( let* ) = Result.bind in
   let matches_crcs crc crc' =
@@ -173,7 +173,7 @@ let resolve ~env:{ stdlib; predicates; gamma; roots; pkgs } ~ambiguity
   | None -> Ok []
   | Some cmi -> begin
       let* archive =
-        Meta.from_cmi_to_impl ~roots ~packages:pkgs ?stdlib ~ambiguity
+        Meta.from_cmi_to_impl ~roots ~packages:pkgs ?stdlib ~disambiguate
           (Info.location cmi)
       in
       match archive with
@@ -181,14 +181,14 @@ let resolve ~env:{ stdlib; predicates; gamma; roots; pkgs } ~ambiguity
       | Some archive -> Meta.archives_of ~roots ~predicates archive
     end
 
-let impls_from_intfs ~env:{ stdlib; roots; pkgs; predicates; _ } ~ambiguity
+let impls_from_intfs ~env:{ stdlib; roots; pkgs; predicates; _ } ~disambiguate
     intfs =
   let ( let* ) = Result.bind in
   let* descrs =
     let fn acc info =
       let* acc = acc in
       let* pkg =
-        Meta.from_cmi_to_impl ~roots ~packages:pkgs ?stdlib ~ambiguity
+        Meta.from_cmi_to_impl ~roots ~packages:pkgs ?stdlib ~disambiguate
           (Uniq_info.location info)
       in
       Ok ((info, pkg) :: acc)
@@ -209,18 +209,18 @@ let impls_from_intfs ~env:{ stdlib; roots; pkgs; predicates; _ } ~ambiguity
   in
   List.fold_left fn (Ok []) archives
 
-let impls ~env ~ambiguity infos =
+let impls ~env ~disambiguate infos =
   let ( let* ) = Result.bind in
   let intfs = List.filter Info.is_a_cmi infos in
-  let* impls = impls_from_intfs ~env ~ambiguity intfs in
-  let resolve = resolve ~env ~ambiguity in
+  let* impls = impls_from_intfs ~env ~disambiguate intfs in
+  let resolve = resolve ~env ~disambiguate in
   close_impls ~resolve intfs impls
 
-let verify ~env ~ambiguity infos =
+let verify ~env ~disambiguate infos =
   let ( let* ) = Result.bind in
   let intfs = List.filter Info.is_a_cmi infos in
-  let* impls = impls_from_intfs ~env ~ambiguity intfs in
-  let resolve = resolve ~env ~ambiguity in
+  let* impls = impls_from_intfs ~env ~disambiguate intfs in
+  let resolve = resolve ~env ~disambiguate in
   let* impls = close_impls ~resolve intfs impls in
   let sources = List.filter (Fun.negate Info.is_a_cmi) infos in
   let names infos =
