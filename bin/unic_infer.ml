@@ -4,6 +4,11 @@ module Solver = Uniq_solver
 module Clos = Uniq_clos
 module Vendor = Uniq_vendor
 
+let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
+
+exception Ambiguous_interface of Modname.t * Info.t list
+exception No_input of Modname.t
+
 let rec prompt modname pkgs =
   let pkgs = List.sort Meta.Path.compare pkgs in
   let pp_pkg_with_idx ppf (idx, pkg) =
@@ -16,6 +21,7 @@ let rec prompt modname pkgs =
     pkgs_with_idx;
   Fmt.pr "Pick one [0-%d]: %!" (List.length pkgs - 1);
   match int_of_string_opt (input_line stdin) with
+  | exception End_of_file -> raise (No_input modname)
   | Some idx when idx >= 0 && idx < List.length pkgs -> List.nth pkgs idx
   | Some _ | None -> prompt modname pkgs
 
@@ -76,11 +82,7 @@ let run _quiet cfg0 roots cfg1 dirs =
            configuration even though we can choose any of the options without a
            doubt! *)
         Some (prefer_stdlib ?stdlib solutions)
-    | _ :: _ as solutions ->
-        Logs.err (fun m -> m "Multiple solutions for %a" Modname.pp modname);
-        Logs.err (fun m ->
-            m "@[<hov>%a@]" Fmt.(list ~sep:(any ",@ ") Info.pp) solutions);
-        assert false
+    | _ :: _ as solutions -> raise (Ambiguous_interface (modname, solutions))
   in
   let* infos, _private_modules = Solver.solve_intfs ~cfg:cfg1 ~providers dirs in
   let ambiguity =
@@ -103,14 +105,40 @@ let run _quiet cfg0 roots cfg1 dirs =
       let infos = Vendor.color impls in
       Fmt.pr "@[<hov>%a@]\n%!" Fmt.(list ~sep:(any ";@ ") Info.pp) infos;
       Ok ()
-  | _ -> assert false
+  | _ ->
+      let pp_hole ppf (m, info) =
+        Fmt.pf ppf "  %a (needed by %a)" Modname.pp m Info.pp info
+      in
+      let pp_section name ppf = function
+        | [] -> ()
+        | holes -> Fmt.pf ppf "%s:@,%a@," name Fmt.(list ~sep:cut pp_hole) holes
+      in
+      error_msgf "@[<v>the dependency graph could not be closed:@,%a%a@]"
+        (pp_section "missing interfaces")
+        intf_holes
+        (pp_section "missing implementations")
+        impl_holes
 
 let run quiet cfg0 roots cfg1 dirs =
-  match run quiet cfg0 roots cfg1 dirs with
+  let result =
+    try run quiet cfg0 roots cfg1 dirs with
+    | Ambiguous_interface (modname, solutions) ->
+        error_msgf
+          "@[<v>%a is provided by several incompatible interfaces:@,%a@]"
+          Modname.pp modname
+          Fmt.(list ~sep:cut (any "  " ++ Info.pp))
+          solutions
+    | No_input modname ->
+        error_msgf "no answer was given to choose which package provides %a"
+          Modname.pp modname
+    | Invalid_argument msg | Failure msg -> error_msgf "%s" msg
+    | exn -> error_msgf "%s" (Printexc.to_string exn)
+  in
+  match result with
   | Ok () -> 0
   | Error (`Msg msg) ->
-      Fmt.epr "%s: %s\n%!" Sys.executable_name msg;
-      exit 1
+      Fmt.epr "%s: %s\n%!" Filename.(basename Sys.executable_name) msg;
+      1
 
 open Cmdliner
 open Unic_cli

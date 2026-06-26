@@ -92,9 +92,12 @@ let missing_intfs infos =
   List.concat_map (fun info -> fst (Info.missing info)) infos
 
 let not_in_forbidden_modules cfg modules =
-  if List.exists (fun (m, _) -> MSet.mem m cfg.forbid) modules = false then
-    Ok ()
-  else error_msgf "Foo"
+  match List.filter (fun (m, _) -> MSet.mem m cfg.forbid) modules with
+  | [] -> Ok ()
+  | forbidden ->
+      error_msgf "@[<hov>the project requires forbidden module(s): %a@]"
+        Fmt.(list ~sep:(any ",@ ") Modname.pp)
+        (List.map fst forbidden)
 
 let sort = List.sort_uniq (fun (a, _) (b, _) -> Modname.compare a b)
 
@@ -118,7 +121,11 @@ let solve_intfs ~cfg:({ recurse; exclude; stdlib; _ } as cfg) ~providers dirs =
         let infos = List.map fn infos in
         Log.debug (fun m -> m "add %a" Info.pp solution);
         (solution :: infos, true, rem)
-    | Some _solution -> assert false
+    | Some _solution ->
+        (* NOTE(dinosaure): The provider points at an artifact we already hold,
+           yet the module is still unresolved (typically a digest mismatch).
+           Leave it pending so it surfaces as a hole rather than aborting. *)
+        (infos, progress, (m, crc) :: rem)
     end
   in
   let rec go infos =
@@ -136,7 +143,14 @@ let solve_intfs ~cfg:({ recurse; exclude; stdlib; _ } as cfg) ~providers dirs =
         if progress then go infos else Ok (infos, modules)
   in
   let* infos = Uniq_resolve.qualify ~stdlib srcs in
-  let* infos, modules = go infos in
+  let* infos, modules =
+    try go infos
+    with Multiple_solutions (m, _crc, solutions) ->
+      error_msgf "@[<v>%a is provided by several incompatible interfaces:@,%a@]"
+        Modname.pp m
+        Fmt.(list ~sep:cut (any "  " ++ Info.pp))
+        solutions
+  in
   (* NOTE(dinosaure): delete modules that we can ignore. *)
   let fn (m, _) = not (MSet.mem m cfg.ignore) in
   let modules = List.filter fn modules in
