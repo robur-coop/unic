@@ -33,35 +33,34 @@ let entries =
 
 let normalize = Astring.String.map (function '-' -> '_' | chr -> chr)
 
-let run quiet native key =
-  match Uniq_cfg.v () with
-  | Error (`Msg msg) -> error_msgf "%s" msg
-  | Ok cfg -> (
-      match key with
-      | None ->
-          (* Dump the whole configuration, one variable per line. *)
-          let print (E (key, w, pp)) =
-            match Uniq_cfg.get ~native cfg ~key w with
-            | Some v -> if not quiet then Fmt.pr "%-26s %a\n%!" key pp v
-            | None -> ()
-          in
-          List.iter print entries; Ok 0
-      | Some k -> (
-          let same (E (key, _, _)) =
-            String.equal (normalize key) (normalize k)
-          in
-          match List.find_opt same entries with
-          | None -> error_msgf "Unknown configuration variable: %S" k
-          | Some (E (key, w, pp)) -> (
-              match Uniq_cfg.get ~native cfg ~key w with
-              | Some v ->
-                  if not quiet then Fmt.pr "%a\n%!" pp v;
-                  Ok 0
-              | None ->
-                  error_msgf
-                    "%S depends on the chosen toolchain; pass --native or \
-                     --bytecode"
-                    k)))
+let run quiet cfg native key =
+  let ( let* ) = Result.bind in
+  let* cfg = match cfg with Some cfg -> Ok cfg | None -> Uniq_cfg.v () in
+  match key with
+  | None ->
+      (* Dump the whole configuration, one variable per line. *)
+      let print (E (key, w, pp)) =
+        match Uniq_cfg.get ~native cfg ~key w with
+        | Some v -> if not quiet then Fmt.pr "%-26s %a\n%!" key pp v
+        | None -> ()
+      in
+      List.iter print entries; Ok 0
+  | Some k -> begin
+      let same (E (key, _, _)) = String.equal (normalize key) (normalize k) in
+      match List.find_opt same entries with
+      | None -> error_msgf "Unknown configuration variable: %S" k
+      | Some (E (key, w, pp)) ->
+          begin match Uniq_cfg.get ~native cfg ~key w with
+          | Some v ->
+              if not quiet then Fmt.pr "%a\n%!" pp v;
+              Ok 0
+          | None ->
+              error_msgf
+                "%S depends on the chosen toolchain; pass --native or \
+                 --bytecode"
+                k
+          end
+    end
 
 open Cmdliner
 open Unic_cli
@@ -85,7 +84,7 @@ let key =
 
 let term =
   let open Term in
-  term_result ~usage:false (const run $ setup_logs $ native $ key)
+  term_result ~usage:false (const run $ setup_logs $ setup_ocaml $ native $ key)
 
 let cmd =
   let doc = "Print the configuration of the OCaml toolchain." in
