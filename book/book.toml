@@ -1,6 +1,0 @@
-[book]
-authors = ["Calascibetta Romain"]
-language = "en"
-multilingual = false
-src = "src"
-title = "Uniq, a Swiss Army Knife for static compilation and reproducibility"
