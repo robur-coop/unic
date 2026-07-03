@@ -97,7 +97,10 @@ let path =
     | Error _ as err -> err
   in
   let existing_context = Arg.conv (parser, Fpath.pp) in
-  Arg.(required & pos ~rev:true 0 (some existing_context) None & info [] ~doc)
+  let open Arg in
+  required
+  & pos ~rev:true 0 (some existing_context) None
+  & info [] ~doc ~docv:"DIRECTORY"
 
 let recurse =
   let doc = "Include sub-directories." in

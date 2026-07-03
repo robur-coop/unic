@@ -18,23 +18,24 @@ type cfg = {
 
 type private_module = Modname.t * Uniq_digest.t option
 
-let config ?(stdlib = true) ?(recurse = true) ?(exclude = []) ?(ignore = [])
-    ?(forbid = []) () =
-  let ignore = MSet.of_list ignore in
-  let forbid = MSet.of_list forbid in
-  { stdlib; recurse; exclude; ignore; forbid }
-
-let to_ignore ~cfg modname = MSet.mem modname cfg.ignore
-
-type providers = ?crc:Digest.t -> Modname.t -> Info.t option
-type disambiguate = Modname.t -> Info.t list -> Info.t
-
 let absolute =
   (* NOTE(dinosaure): [Fpath.v] should be fine! *)
   let cwd = Fpath.v (Sys.getcwd ()) in
   fun path ->
     let path = if Fpath.is_rel path then Fpath.(cwd // path) else path in
     Fpath.normalize path
+
+let config ?(stdlib = true) ?(recurse = true) ?(exclude = []) ?(ignore = [])
+    ?(forbid = []) () =
+  let ignore = MSet.of_list ignore in
+  let forbid = MSet.of_list forbid in
+  let exclude = List.map absolute exclude in
+  { stdlib; recurse; exclude; ignore; forbid }
+
+let to_ignore ~cfg modname = MSet.mem modname cfg.ignore
+
+type providers = ?crc:Digest.t -> Modname.t -> Info.t option
+type disambiguate = Modname.t -> Info.t list -> Info.t
 
 exception Multiple_solutions of Modname.t * Digest.t option * Info.t list
 
