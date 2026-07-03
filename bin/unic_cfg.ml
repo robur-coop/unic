@@ -88,5 +88,20 @@ let term =
 
 let cmd =
   let doc = "Print the configuration of the OCaml toolchain." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) prints the configuration of the OCaml toolchain, as \
+         $(b,ocamlc -config) does. If a variable is given as an argument, only \
+         its value is printed."
+    ; `P
+        "With the $(b,--toolchain) option, the configuration comes from the \
+         given ocamlfind toolchain (such as $(b,solo5)) instead of the host \
+         one."
+    ; `P
+        "Some variables depend on the compiler used. In this case, \
+         $(b,--native) or $(b,--bytecode) must be given."
+    ]
+  in
   Cmd.v (Cmd.info "cfg" ~doc ~man) term

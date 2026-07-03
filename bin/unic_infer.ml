@@ -211,7 +211,7 @@ let recurse =
 
 let exclude =
   let doc =
-    "Exlude a file, or a directory (and its sub-directories), from resolution."
+    "Exclude a file, or a directory (and its sub-directories), from resolution."
   in
   let v = path in
   Arg.(value & opt_all v [] & info [ "x"; "exclude" ] ~doc ~docv:"PATH")
@@ -258,7 +258,34 @@ let term =
   $ dirs
 
 let cmd =
-  let doc = "Infer the opam package an OCaml project should vendor." in
-  let man = [ `S Manpage.s_description ] in
+  let doc = "Infer packages an OCaml project should vendor." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) scans the given directories for OCaml sources and objects, \
+         computes the set of modules the project requires and searches which \
+         $(b,ocamlfind) packages provide them. Then, $(tname) prints the \
+         $(b,opam) packages from which these $(b,ocamlfind) packages come."
+    ; `P
+        "The aim is to inform the user about what should be recompiled (or \
+         vendored) if they wish to build the project with a different \
+         toolchain, such as the one provided by Solo5 (see the \
+         $(b,--toolchain) option)."
+    ; `P
+        "When several $(b,ocamlfind) packages provide the same module, \
+         $(tname) asks the user to pick one. These choices can be given in \
+         advance with the $(b,--prefer) option or with a policy file (see the \
+         $(b,--config) option)."; `S Manpage.s_examples
+    ; `P
+        "Infer the $(b,opam) packages needed by a unikernel, where the \
+         $(b,bin/) directory contains an executable which should not be \
+         compiled with the Solo5 toolchain and where $(b,Documents) is a \
+         generated module:"
+    ; `Pre
+        "  \\$ unic infer -r . --toolchain solo5 --exclude bin/ \\\\\n\
+        \      --ignore Documents --prefer digestif.c"
+    ]
+  in
   let info = Cmd.info "infer" ~doc ~man in
   Cmd.v info term

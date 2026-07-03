@@ -148,7 +148,7 @@ let setup_ocamlfind toolchain user's_directories =
 let toolchain =
   let doc =
     "Use the $(b,ocamlfind) toolchain $(i,NAME) (e.g. $(b,solo5)) instead of \
-     the host one: both the OCaml configuration and the package rotos are \
+     the host one: both the OCaml configuration and the package roots are \
      taken from that cross toolchain."
   in
   let open Arg in

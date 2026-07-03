@@ -44,8 +44,16 @@ let term_show =
   ret (const show $ setup_logs $ file)
 
 let cmd_show =
-  let doc = "Print informations about an OCaml file." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let doc = "Print information about an OCaml object." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) reads an OCaml object (a $(b,.cmi), $(b,.cmo), $(b,.cmx), \
+         $(b,.cma) or $(b,.cmxa) file) and prints what the object exports and \
+         what it imports, with the digest of each module."
+    ]
+  in
   Cmd.v (Cmd.info "show" ~doc ~man) term_show
 
 let directories =
@@ -156,11 +164,32 @@ let term_search =
 
 let cmd_search =
   let doc = "Search a module from a module name and a $(i,digest)." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) searches, into the $(b,ocamlfind) directories, the OCaml \
+         objects which provide the given module. If a digest is given (see the \
+         $(b,--digest) option and $(b,unic digest)), only the objects which \
+         export the module with this digest are printed."
+    ; `P
+        "Some filters are available to restrict the search to interfaces or \
+         implementations, to sources or objects, and to native or bytecode \
+         objects."
+    ]
+  in
   Cmd.v (Cmd.info "search" ~doc ~man) term_search
 
 let cmd =
   let doc = "A tool to manipulate OCaml objects." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) offers some tools to inspect OCaml objects: $(b,show) prints \
+         what an object exports and imports, and $(b,search) finds which \
+         objects provide a given module."
+    ]
+  in
   let default = Term.(ret (const (`Help (`Pager, None)))) in
   Cmd.group ~default (Cmd.info "info" ~doc ~man) [ cmd_show; cmd_search ]

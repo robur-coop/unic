@@ -85,5 +85,17 @@ let term =
 
 let cmd =
   let doc = "Try to extract the $(i,digest) from an OCaml object." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) reads an OCaml object and prints the digest of the given \
+         module. If the object exports only one module, the module name can be \
+         omitted."
+    ; `P
+        "The digest is what the OCaml compiler uses to verify that two objects \
+         agree on a module. It can be used with $(b,unic info search) to find \
+         the objects which provide the same module."
+    ]
+  in
   Cmd.v (Cmd.info "digest" ~doc ~man) term

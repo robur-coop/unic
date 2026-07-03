@@ -96,17 +96,9 @@ let recurse =
   let doc = "Include sub-directories." in
   Arg.(value & flag & info [ "r"; "recurse" ] ~doc)
 
-let no_stdlib =
+let without_stdlib =
   let doc = "Do not add the standard library to the list of include sources." in
-  Arg.(value & flag & info [ "no-stdlib" ] ~doc)
-
-let prefer =
-  let doc =
-    "Prefer these packages when multiple provide the same module \
-     (comma-separated)."
-  in
-  Arg.(
-    value & opt (list string) [] & info [ "prefer" ] ~doc ~docv:"PKG1,PKG2,...")
+  Arg.(value & flag & info [ "without-stdlib" ] ~doc)
 
 let term =
   let open Term in
@@ -115,11 +107,25 @@ let term =
   $ setup_ocaml
   $ recurse
   $ path
-  $ no_stdlib
+  $ without_stdlib
   $ setup_ocamlfind
   |> term_result
 
 let cmd =
-  let doc = "Print information about an OCaml file." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let doc = "Resolve the missing modules of an OCaml project." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) qualifies the given OCaml project (as $(b,unic qualify) \
+         does) and collects the modules required by the project but not \
+         provided by it. Then, for each missing module, $(tname) searches an \
+         $(b,ocamlfind) package which provides it."
+    ; `P
+        "For each missing module, three results are possible: the module is \
+         resolved (only one package provides it), the module is ambiguous \
+         (several packages provide it) or the module is not found (no package \
+         provides it)."
+    ]
+  in
   Cmd.v (Cmd.info "resolve" ~doc ~man) term

@@ -121,6 +121,23 @@ let term =
   |> term_result
 
 let cmd =
-  let doc = "Print information about an OCaml file." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let doc = "Qualify the modules of an OCaml project." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) reads the sources and the objects of an OCaml project and \
+         qualifies every module found: for each artifact, it prints what the \
+         artifact exports and what it imports, with the digest of each module."
+    ; `P
+        "Finally, $(tname) prints the interfaces and the implementations \
+         required by the project but not provided by it. These missing modules \
+         must come from somewhere else, such as an $(b,ocamlfind) package (see \
+         $(b,unic resolve))."
+    ; `P
+        "By default, the standard library is added to the include sources, so \
+         modules like $(b,Stdlib) are not reported as missing (see the \
+         $(b,--without-stdlib) option)."
+    ]
+  in
   Cmd.v (Cmd.info "qualify" ~doc ~man) term

@@ -85,25 +85,61 @@ let term_ancestors =
     (const ancestors $ setup_logs $ predicates $ setup_ocamlfind $ meta_path)
 
 let cmd_show =
-  let doc = "Parse & print META file." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let doc = "Parse & print a META file." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) parses the given META file and prints it back. It can be \
+         used to verify that $(mname) understands a META file as \
+         $(b,ocamlfind) does."
+    ]
+  in
   Cmd.v (Cmd.info "show" ~doc ~man) term_show
 
 let cmd_search =
   let doc =
     "Search a description from a META path, a directory and predicates."
   in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) searches the given META path (such as $(b,decompress.de)) \
+         into the $(b,ocamlfind) directories and prints its description: its \
+         dependencies, its archives, etc."
+    ; `P
+        "The description can be refined by predicates (such as $(b,native) or \
+         $(b,byte), see the $(b,--predicate) option)."
+    ]
+  in
   Cmd.v (Cmd.info "search" ~doc ~man) term_search
 
 let cmd_ancestors =
-  let doc = "" in
-  let man = [] in
+  let doc = "Print the description of a META path and of its ancestors." in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) behaves as $(b,search) does but also prints the description \
+         of every ancestor of the given META path. For instance, the ancestor \
+         of $(b,decompress.de) is $(b,decompress)."
+    ]
+  in
   Cmd.v (Cmd.info "ancestors" ~doc ~man) term_ancestors
 
 let cmd =
   let doc = "A tool to manipulate META files." in
-  let man = [ `S Manpage.s_description; `P "$(tname)" ] in
+  let man =
+    [
+      `S Manpage.s_description
+    ; `P
+        "$(tname) offers some tools to inspect the META files used by \
+         $(b,ocamlfind): $(b,show) parses and prints a META file, $(b,search) \
+         prints the description of a META path and $(b,ancestors) prints the \
+         description of a META path and of its ancestors."
+    ]
+  in
   let default = Term.(ret (const (`Help (`Pager, None)))) in
   Cmd.group ~default
     (Cmd.info "meta" ~doc ~man)
