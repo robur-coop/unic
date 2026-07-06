@@ -14,4 +14,11 @@ depends: [
   "dune"        {>= "2.8.0"}
   "codept"      {>= "0.12.1"}
   "opam-state"
+  "opam-format"
+  "opam-core"
+  "logs"
+  "fmt"
+  "fpath"
+  "bos"
+  "bcfgt"
 ]

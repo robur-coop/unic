@@ -40,7 +40,7 @@
  (public_name uniq.cfg)
  (modules uniq_cfg)
  (wrapped false)
- (libraries compiler-libs.common cmdliner bos))
+ (libraries compiler-libs.common bos))
 
 (library
  (name uniq_solver)

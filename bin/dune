@@ -68,6 +68,7 @@
  (public_name unic.cli)
  (wrapped false)
  (libraries
+  cmdliner
   compiler-libs.common
   uniq.cfg
   uniq.meta
