@@ -5,7 +5,7 @@ authors:      "Romain Calascibetta <romain.calascibetta@gmail.com>"
 homepage:     "https://git.robur.coop/robur/uniq"
 bug-reports:  "https://git.robur.coop/robur/uniq/issues"
 dev-repo:     "git+https://git.robur.coop/robur/uniq.git"
-license:      "MIT"
+license:      "AGPL"
 
 build: ["dune" "build" "-p" name "-j" jobs]
 
