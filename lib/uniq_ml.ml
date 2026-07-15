@@ -22,7 +22,7 @@ module Solver = Solver.Make (Envt.Core) (Param) (Engine)
 
 exception Invalid_source_file of string
 
-let add_info { Unit.ml; mli } (filename, p) =
+let add_info { Comp_unit.ml; mli } (filename, p) =
   let k =
     match Support.extension filename with
     | "ml" -> { Read.format= Src; kind= M2l.Structure }
@@ -32,11 +32,11 @@ let add_info { Unit.ml; mli } (filename, p) =
   in
   let x = (k, filename, p) in
   match k.kind with
-  | M2l.Structure -> { Unit.ml= x :: ml; mli }
-  | M2l.Signature -> { Unit.mli= x :: mli; ml }
+  | M2l.Structure -> { Comp_unit.ml= x :: ml; mli }
+  | M2l.Signature -> { Comp_unit.mli= x :: mli; ml }
 
 type _ Effect.t +=
-  | Read_file : Read.kind * string * Namespaced.t -> Unit.s Effect.t
+  | Read_file : Read.kind * string * Namespaced.t -> Comp_unit.s Effect.t
 
 let pp_format ppf = function
   | Read.Src -> Fmt.string ppf "source"
@@ -58,11 +58,13 @@ let read (k, filename, n) =
 let analyze ?version:(release = Sys.ocaml_release) ?(stdlib = true) pkgs files =
   let version = (release.Sys.major, release.Sys.minor) in
   let fn =
-    let open Unit.Group in
+    let open Comp_unit.Group in
     Fun.compose fst (Fun.compose split group)
   in
-  let units : _ Unit.pair = files |> Unit.unimap (List.map read) |> fn in
-  let namespace = List.map (fun (u : Unit.s) -> u.path) units.mli in
+  let units : _ Comp_unit.pair =
+    files |> Comp_unit.unimap (List.map read) |> fn
+  in
+  let namespace = List.map (fun (u : Comp_unit.s) -> u.path) units.mli in
   let implicits =
     if stdlib then
       let stdlib = Bundle.versioned_stdlib version |> Module.Dict.of_list in
@@ -88,7 +90,9 @@ let run ?version ?stdlib lst =
     (name, Namespaced.of_path nms)
   in
   let lst = List.map to_namespaced lst in
-  let files = List.fold_left add_info { Unit.ml= []; Unit.mli= [] } lst in
+  let files =
+    List.fold_left add_info { Comp_unit.ml= []; Comp_unit.mli= [] } lst
+  in
   analyze ?version ?stdlib [] files
 
 let run_into ?version ?stdlib ~current lst =
@@ -104,7 +108,7 @@ let run_into ?version ?stdlib ~current lst =
         in
         let path = Fpath.to_string path in
         begin try
-          let v = Unit.read_file Param.fault_handler kind path n in
+          let v = Comp_unit.read_file Param.fault_handler kind path n in
           Some (fun k -> continue k v)
         with exn -> raise exn
         end

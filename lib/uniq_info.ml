@@ -124,8 +124,8 @@ and elt =
   | Named of Modname.t
 
 and 'a kind =
-  | Ml : Unit.u kind
-  | Mli : Unit.u kind
+  | Ml : Comp_unit.u kind
+  | Mli : Comp_unit.u kind
   | Cmo : Cmo_format.compilation_unit kind
   | Cma : Cmo_format.library kind
   | Cmi : Cmi_format.cmi_infos kind
@@ -567,15 +567,15 @@ let from_source location =
       let modname = Unitname.modname name in
       let exports = [ (modname, None) ] in
       match (Uniq_ml.run_into ~current [ basename ], kind) with
-      | { Unit.mli= [ u ]; ml= [] }, M2l.Structure ->
+      | { Comp_unit.mli= [ u ]; ml= [] }, M2l.Structure ->
           let intfs, impls =
-            Deps.all u.Unit.more.Unit.dependencies
+            Deps.all u.Comp_unit.more.Comp_unit.dependencies
             |> List.fold_left to_elt ([], [])
           in
           let format = Format (Ml, u) in
           (* TODO(dinosaure): I don't know what I should add on [modules]. For
              my perspective, it's what the [*.ml] implements and we should look
-             into the [u.Unit.code] and see which modules we implements
+             into the [u.Comp_unit.code] and see which modules we implements
              ([module Foo = struct ... end]).
 
              We can probably assert that what is missing for the same [*.cmx]
@@ -586,17 +586,18 @@ let from_source location =
              [*.cmx{,a}]. *)
           let modules = Path.Set.empty in
           Ok { name; version; modules; exports; intfs; impls; format }
-      | { Unit.mli= [ u ]; ml= [] }, M2l.Signature ->
+      | { Comp_unit.mli= [ u ]; ml= [] }, M2l.Signature ->
           let intfs, impls =
-            Deps.all u.Unit.more.Unit.dependencies
+            Deps.all u.Comp_unit.more.Comp_unit.dependencies
             |> List.fold_left to_elt ([], [])
           in
           let format = Format (Mli, u) in
-          let modules = collect_modules_on_mli ~modname u.Unit.code in
+          let modules = collect_modules_on_mli ~modname u.Comp_unit.code in
           Ok { name; version; modules; exports; intfs; impls; format }
-      | { Unit.ml; mli }, _ ->
-          Log.err (fun m -> m "ml: @[<hov>%a@]" Fmt.(Dump.list Unit.pp) ml);
-          Log.err (fun m -> m "mli: @[<hov>%a@]" Fmt.(Dump.list Unit.pp) mli);
+      | { Comp_unit.ml; mli }, _ ->
+          Log.err (fun m -> m "ml: @[<hov>%a@]" Fmt.(Dump.list Comp_unit.pp) ml);
+          Log.err (fun m ->
+              m "mli: @[<hov>%a@]" Fmt.(Dump.list Comp_unit.pp) mli);
           assert false)
   | _ -> error_msgf "Invalid OCaml object: %a" Fpath.pp location
 

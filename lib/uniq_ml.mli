@@ -1,7 +1,7 @@
 module Param : Stage.param
 
 type _ Effect.t +=
-  | Read_file : Read.kind * string * Namespaced.t -> Unit.s Effect.t
+  | Read_file : Read.kind * string * Namespaced.t -> Comp_unit.s Effect.t
 
 exception Invalid_source_file of string
 
@@ -9,14 +9,14 @@ val run :
      ?version:Sys.ocaml_release_info
   -> ?stdlib:bool
   -> Name.t list
-  -> Unit.u list Unit.pair
+  -> Comp_unit.u list Comp_unit.pair
 
 val run_into :
      ?version:Sys.ocaml_release_info
   -> ?stdlib:bool
   -> current:Fpath.t
   -> Name.t list
-  -> Unit.u list Unit.pair
+  -> Comp_unit.u list Comp_unit.pair
 (** [run_into ?version ~current filenames] it resolves the dependencies of given
     source files [filenames] in a given folder [current] (considered to be the
     root for the namespace).

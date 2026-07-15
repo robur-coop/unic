@@ -22,3 +22,6 @@ depends: [
   "bos"
   "bcfgt"
 ]
+pin-depends: [
+  [ "codept" "git+https://github.com/Octachron/codept.git#1700ecd55380f93f7f005a37c0fa84a4b1bd9a2e" ]
+]

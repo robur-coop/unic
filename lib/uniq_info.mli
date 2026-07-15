@@ -30,8 +30,8 @@ and elt =
   | Named of Modname.t
 
 and 'a kind =
-  | Ml : Unit.u kind
-  | Mli : Unit.u kind
+  | Ml : Comp_unit.u kind
+  | Mli : Comp_unit.u kind
   | Cmo : Cmo_format.compilation_unit kind
   | Cma : Cmo_format.library kind
   | Cmi : Cmi_format.cmi_infos kind

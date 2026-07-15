@@ -281,18 +281,23 @@ let from_sources ~stdlib ~cmis = function
         List.map (Fun.compose Unitname.modulize Fpath.to_string) sources
       in
       let sources = List.map Unitname.filepath sources in
-      let { Unit.ml; Unit.mli } = Uniq_ml.run_into ~stdlib ~current sources in
+      let { Comp_unit.ml; Comp_unit.mli } =
+        Uniq_ml.run_into ~stdlib ~current sources
+      in
       List.map
         begin fun u ->
           let intfs, impls =
-            Unit.deps u
+            Comp_unit.deps u
             |> Deps.all
-            (* NOTE(dinosaure): same as [Deps.all u.Unit.more.Unit.dependencies] *)
+            (* NOTE(dinosaure): same as [Deps.all u.Comp_unit.more.Comp_unit.dependencies] *)
             |> List.fold_left Info.to_elt ([], [])
           in
-          let location = Fpath.v (Namespaced.filepath u.Unit.src.Pkg.file) in
+          let location =
+            Fpath.v (Namespaced.filepath u.Comp_unit.src.Pkg.file)
+          in
           let name = Unitname.modulize (Fpath.to_string location) in
-          assert (Unitname.modname name = Namespaced.module_name u.Unit.path);
+          assert (
+            Unitname.modname name = Namespaced.module_name u.Comp_unit.path);
           let kind =
             match Support.extension (Fpath.to_string location) with
             | "ml" -> M2l.Structure

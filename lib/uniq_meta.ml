@@ -526,11 +526,13 @@ let scan_mlis ~targets ~full ~dname acc =
           let kind = { Read.format= Read.Src; kind= M2l.Signature } in
           let namespace = Namespaced.make (Filename.chop_suffix fname ".mli") in
           let v =
-            Unit.read_file Uniq_ml.Param.fault_handler kind
+            Comp_unit.read_file Uniq_ml.Param.fault_handler kind
               (Fpath.to_string filepath) namespace
           in
           let modname = Namespaced.module_name namespace in
-          let modules = Uniq_info.collect_modules_on_mli ~modname v.Unit.code in
+          let modules =
+            Uniq_info.collect_modules_on_mli ~modname v.Comp_unit.code
+          in
           (* NOTE(dinosaure): the objective here is to try to find some modules
              which exists surely into a "sub-sub-module". A module (the first
              [_]) can be recognized via [*.cmi]. Inside it, we can find
