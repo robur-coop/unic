@@ -21,5 +21,6 @@ depends: [
   "cmdliner"
 ]
 pin-depends: [
-  [ "codept" "git+https://github.com/Octachron/codept.git#1700ecd55380f93f7f005a37c0fa84a4b1bd9a2e" ]
+  [ "bcfg.dev" "git+https://github.com/robur-coop/bcfg.git#4e32d92906bcb53123f19f936d0980aa3a19ab53" ]
+  [ "bcfgt.dev" "git+https://github.com/robur-coop/bcfg.git#4e32d92906bcb53123f19f936d0980aa3a19ab53" ]
 ]
