@@ -6,6 +6,7 @@ homepage:     "https://git.robur.coop/robur/uniq"
 bug-reports:  "https://git.robur.coop/robur/uniq/issues"
 dev-repo:     "git+https://git.robur.coop/robur/uniq.git"
 license:      "AGPL-3.0-or-later"
+synopsis:     "A tool to infer what is needed to vendors to compile unikernels"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
