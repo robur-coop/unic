@@ -5,10 +5,8 @@ authors:      "Romain Calascibetta <romain.calascibetta@gmail.com>"
 homepage:     "https://git.robur.coop/robur/uniq"
 bug-reports:  "https://git.robur.coop/robur/uniq/issues"
 dev-repo:     "git+https://git.robur.coop/robur/uniq.git"
-license:      "AGPL"
-
+license:      "AGPL-3.0-or-later"
 build: ["dune" "build" "-p" name "-j" jobs]
-
 depends: [
   "ocaml"       {>= "4.07.0"}
   "dune"        {>= "2.8.0"}
@@ -21,8 +19,4 @@ depends: [
   "fpath"
   "bos"
   "bcfgt"
-]
-pin-depends: [
-  [ "bcfg.dev" "git+https://github.com/robur-coop/bcfg.git#4e32d92906bcb53123f19f936d0980aa3a19ab53" ]
-  [ "bcfgt.dev" "git+https://github.com/robur-coop/bcfg.git#4e32d92906bcb53123f19f936d0980aa3a19ab53" ]
 ]
