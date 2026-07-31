@@ -161,7 +161,7 @@ let run _quiet cfg0 roots cfg1 policy dirs =
         Opam.with_switch_state @@ fun sw ->
         Opam.package_names_of_meta_dirs ~sw dirs
       in
-      Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
+      if pkgs <> [] then Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
       Ok ()
   | _ ->
       let pp_hole ppf (m, info) =
@@ -169,9 +169,9 @@ let run _quiet cfg0 roots cfg1 policy dirs =
       in
       let pp_section name ppf = function
         | [] -> ()
-        | holes -> Fmt.pf ppf "%s:@,%a@," name Fmt.(list ~sep:cut pp_hole) holes
+        | holes -> Fmt.pf ppf "@,%s:@,%a" name Fmt.(list ~sep:cut pp_hole) holes
       in
-      error_msgf "@[<v>the dependency graph could not be closed:@,%a%a@]"
+      error_msgf "@[<v>the dependency graph could not be closed:%a%a@]"
         (pp_section "missing interfaces")
         intf_holes
         (pp_section "missing implementations")

@@ -1,9 +1,5 @@
 open Cmdliner
 
-let default =
-  let open Term in
-  ret (const (`Help (`Pager, None)))
-
 let () =
   let doc = "Analyse the dependencies of an OCaml project." in
   let man =
@@ -29,7 +25,7 @@ let () =
   in
   let info = Cmd.info "unic" ~doc ~man in
   let cmd =
-    Cmd.group ~default info
+    Cmd.group ~default:Unic_infer.term info
       [
         Unic_infer.cmd; Unic_info.cmd; Unic_qualify.cmd; Unic_meta.cmd
       ; Unic_digest.cmd; Unic_resolve.cmd; Unic_cfg.cmd

@@ -1,0 +1,7 @@
+(executable
+ (name normalize)
+ (modules normalize))
+
+(cram
+ (applies_to :whole_subtree)
+ (deps %{bin:unic} normalize.exe))
