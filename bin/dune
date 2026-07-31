@@ -27,8 +27,8 @@
 (library
  (name unic_meta)
  (modules unic_meta)
- (public_name unic.meta)
- (libraries compiler-libs.common unic.cli uniq.meta))
+ (public_name unic.mmeta)
+ (libraries compiler-libs.common unic.cli uniq.mmeta))
 
 (library
  (name unic_digest)
@@ -40,7 +40,7 @@
  (name unic_resolve)
  (modules unic_resolve)
  (public_name unic.resolve)
- (libraries compiler-libs.common unic.cli uniq.cfg uniq.meta uniq.mod))
+ (libraries compiler-libs.common unic.cli uniq.cfg uniq.mmeta uniq.mod))
 
 (library
  (name unic_cfg)
@@ -57,7 +57,7 @@
   unic.infer
   unic.info
   unic.qualify
-  unic.meta
+  unic.mmeta
   unic.digest
   unic.resolve
   unic.cfg))
@@ -71,7 +71,7 @@
   cmdliner
   compiler-libs.common
   uniq.cfg
-  uniq.meta
+  uniq.mmeta
   uniq.policy
   re
   bos

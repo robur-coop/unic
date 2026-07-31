@@ -22,7 +22,7 @@
 
 (library
  (name uniq_meta)
- (public_name uniq.meta)
+ (public_name uniq.mmeta)
  (modules uniq_meta uniq_meta_lexer)
  (wrapped false)
  (libraries compiler-libs.common logs fmt fpath bos uniq.mod))
@@ -54,7 +54,7 @@
  (public_name uniq.clos)
  (modules uniq_clos)
  (wrapped false)
- (libraries logs fmt fpath uniq.cfg uniq.meta))
+ (libraries logs fmt fpath uniq.cfg uniq.mmeta))
 
 (library
  (name uniq_vendor)
@@ -68,4 +68,4 @@
  (public_name uniq.policy)
  (modules uniq_policy)
  (wrapped false)
- (libraries uniq.meta bcfgt cmdliner))
+ (libraries uniq.mmeta bcfgt cmdliner))
