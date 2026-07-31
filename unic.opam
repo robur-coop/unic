@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name:         "uniq"
+name:         "unic"
 maintainer:   "Romain Calascibetta <romain.calascibetta@gmail.com>"
 authors:      "Romain Calascibetta <romain.calascibetta@gmail.com>"
 homepage:     "https://git.robur.coop/robur/uniq"
