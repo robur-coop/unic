@@ -195,7 +195,9 @@ let run quiet cfg0 roots cfg1 policy dirs =
   match result with
   | Ok () -> 0
   | Error (`Msg msg) ->
-      Fmt.epr "%s: %s\n%!" Filename.(basename Sys.executable_name) msg;
+      Fmt.epr "%s: %s\n%!"
+        Filename.(chop_extension (basename Sys.executable_name))
+        msg;
       1
 
 open Cmdliner
