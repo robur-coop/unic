@@ -12,7 +12,7 @@ Basic layout of a project (like an unikernel)
   > EOF
 
   $ unic infer proj/
-  unic.exe: the dependency graph could not be closed:
+  unic: the dependency graph could not be closed:
   missing interfaces:
     Fixture_core (needed by $TESTCASE_ROOT/proj/main.ml)
   [1]
@@ -33,7 +33,7 @@ Basic layout of a project (like an unikernel)
   > let () = ignore (Checkseum.Crc32.default)
   > EOF
   $ unic infer --prefer checkseum.c gen/
-  unic.exe: the dependency graph could not be closed:
+  unic: the dependency graph could not be closed:
   missing interfaces:
     Documents (needed by $TESTCASE_ROOT/gen/main.ml)
   [1]
@@ -45,5 +45,5 @@ Basic layout of a project (like an unikernel)
   checkseum
 
   $ unic infer --forbid Checkseum --prefer checkseum.c gen/ --ignore Documents
-  unic.exe: the project requires forbidden module(s): Checkseum
+  unic: the project requires forbidden module(s): Checkseum
   [1]

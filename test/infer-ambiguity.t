@@ -22,7 +22,7 @@ How unic reacts with `digestif.{c,ocaml}`
   Module Digestif is provided by several ocamlfind packages:
     [0] digestif.c
     [1] digestif.ocaml
-  Pick one [0-1]: unic.exe: no answer was given to choose which package provides Digestif
+  Pick one [0-1]: unic: no answer was given to choose which package provides Digestif
   [1]
 
   $ unic infer --prefer digestif.c hash/
