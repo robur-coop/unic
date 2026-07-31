@@ -1,5 +1,6 @@
 How unic reacts with `digestif.{c,ocaml}`
 
+  $ export NO_COLOR=1
   $ mkdir -p hash
   $ cat > hash/main.ml <<EOF
   > let () = print_string Digestif.SHA1.(to_hex (digest_string ""))
@@ -59,5 +60,5 @@ How unic reacts with `digestif.{c,ocaml}`
 
   $ unic infer --config missing.cfg mix/
   Usage: unic infer [--help] [OPTION]… DIRECTORY…
-  unic: option --config: missing.cfg does not exist
+  unic: option '--config': missing.cfg does not exist
   [124]
