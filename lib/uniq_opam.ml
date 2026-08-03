@@ -7,7 +7,7 @@ type 'a sw = 'a OpamStateTypes.switch_state
 
 let setup () =
   OpamFormatConfig.init ();
-  OpamCoreConfig.init ();
+  OpamCoreConfig.init ~safe_mode:true ();
   let root = OpamStateConfig.opamroot () in
   let _cfg = OpamStateConfig.load_defaults ~lock_kind:`Lock_none root in
   ignore _cfg
