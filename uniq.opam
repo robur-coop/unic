@@ -14,9 +14,9 @@ depends: [
   "ocaml"       {>= "5.0"}
   "dune"        {>= "2.8.0"}
   "codept"      {>= "0.13.0"}
-  "opam-state"
-  "opam-format"
-  "opam-core"   {>= "2.6.0~alpha1"}
+  "opam-core"   {= opam-version & >= "2.6.0~alpha1"}
+  "opam-state"  {= opam-version}
+  "opam-format" {= opam-version}
   "logs"
   "fmt"
   "fpath"
