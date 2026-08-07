@@ -2,9 +2,9 @@ opam-version: "2.0"
 name:         "unic"
 maintainer:   "Romain Calascibetta <romain.calascibetta@gmail.com>"
 authors:      "Romain Calascibetta <romain.calascibetta@gmail.com>"
-homepage:     "https://git.robur.coop/robur/uniq"
-bug-reports:  "https://git.robur.coop/robur/uniq/issues"
-dev-repo:     "git+https://git.robur.coop/robur/uniq.git"
+homepage:     "https://git.robur.coop/robur/unic"
+bug-reports:  "https://git.robur.coop/robur/unic/issues"
+dev-repo:     "git+https://git.robur.coop/robur/unic.git"
 license:      "AGPL-3.0-or-later"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
