@@ -167,10 +167,11 @@ let run _quiet cfg0 roots cfg1 policy dirs output =
         | Some filename ->
           try
             let oc = open_out_bin (Fpath.to_string filename) in
-            Fun.protect ~finally:(fun () -> close_out oc)
+            Fun.protect
+              ~finally:(fun () -> close_out oc)
               (fun () ->
                  let contents = String.concat "\n" pkgs in
-                 output_string oc contents;
+                 output_string oc (contents ^ "\n");
                  Ok ())
           with
             Sys_error err -> error_msgf "%s" err
