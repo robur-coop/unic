@@ -54,7 +54,7 @@ let prefer_stdlib ?stdlib solutions =
       List.find_opt in_stdlib solutions
       |> Option.value ~default:(List.hd solutions)
 
-let run _quiet cfg0 roots cfg1 policy dirs =
+let run _quiet cfg0 roots cfg1 policy dirs output =
   let ( let* ) = Result.bind in
   let* env = Uniq_clos.env ?cfg:cfg0 roots in
   let stdlib = Uniq_clos.stdlib env in
@@ -161,8 +161,21 @@ let run _quiet cfg0 roots cfg1 policy dirs =
         Opam.with_switch_state @@ fun sw ->
         Opam.package_names_of_meta_dirs ~sw dirs
       in
-      if pkgs <> [] then Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
-      Ok ()
+      if pkgs <> [] then
+        match output with
+        | None -> Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs; Ok ()
+        | Some filename ->
+          try
+            let oc = open_out_bin (Fpath.to_string filename) in
+            Fun.protect ~finally:(fun () -> close_out oc)
+              (fun () ->
+                 let contents = String.concat "\n" pkgs in
+                 output_string oc contents;
+                 Ok ())
+          with
+            Sys_error err -> error_msgf "%s" err
+      else
+        Ok ()
   | _ ->
       let pp_hole ppf (m, info) =
         Fmt.pf ppf "  %a (needed by %a)" Modname.pp m Info.pp info
@@ -177,9 +190,9 @@ let run _quiet cfg0 roots cfg1 policy dirs =
         (pp_section "missing implementations")
         impl_holes
 
-let run quiet cfg0 roots cfg1 policy dirs =
+let run quiet cfg0 roots cfg1 policy dirs output =
   let result =
-    try run quiet cfg0 roots cfg1 policy dirs with
+    try run quiet cfg0 roots cfg1 policy dirs output with
     | Ambiguous_interface (modname, solutions) ->
         error_msgf
           "@[<v>%a is provided by several incompatible interfaces:@,%a@]"
@@ -239,6 +252,15 @@ let dirs =
   let doc = "The OCaml project directories." in
   Arg.(non_empty & pos_all existing_dirpath [] & info [] ~doc ~docv:"DIRECTORY")
 
+let fpath = Arg.conv (Fpath.of_string, Fpath.pp)
+
+let output =
+  let doc = "The output file to write (defaults to standard output)." in
+  let open Arg in
+  value
+  & opt (some fpath) None
+  & info [ "o"; "output" ] ~doc ~docv:"FILE"
+
 let setup_solver without_stdlib recurse exclude ignore forbid =
   let ignore = List.concat ignore in
   let forbid = List.concat forbid in
@@ -258,6 +280,7 @@ let term =
   $ setup_solver
   $ setup_policy
   $ dirs
+  $ output
 
 let cmd =
   let doc = "Infer packages an OCaml project should vendor." in
