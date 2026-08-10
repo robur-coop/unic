@@ -7,6 +7,7 @@ module Opam = Uniq_opam
 module Option = Stdlib.Option
 
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
+let ( let@ ) finally fn = Fun.protect ~finally fn
 
 exception Ambiguous_interface of Modname.t * Info.t list
 exception No_input of Modname.t
@@ -161,22 +162,20 @@ let run _quiet cfg0 roots cfg1 policy dirs output =
         Opam.with_switch_state @@ fun sw ->
         Opam.package_names_of_meta_dirs ~sw dirs
       in
-      if pkgs <> [] then
-        match output with
-        | None -> Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs; Ok ()
-        | Some filename ->
-          try
-            let oc = open_out_bin (Fpath.to_string filename) in
-            Fun.protect
-              ~finally:(fun () -> close_out oc)
-              (fun () ->
-                 let contents = String.concat "\n" pkgs in
-                 output_string oc (contents ^ "\n");
-                 Ok ())
-          with
-            Sys_error err -> error_msgf "%s" err
-      else
+      if pkgs <> [] then begin
+        let ppf, finally =
+          match output with
+          | None -> (Fmt.stdout, ignore)
+          | Some filename ->
+              let oc = open_out_bin (Fpath.to_string filename) in
+              let finally () = close_out oc in
+              (Format.formatter_of_out_channel oc, finally)
+        in
+        let@ () = finally in
+        Fmt.pf ppf "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
         Ok ()
+      end
+      else Ok ()
   | _ ->
       let pp_hole ppf (m, info) =
         Fmt.pf ppf "  %a (needed by %a)" Modname.pp m Info.pp info
@@ -253,13 +252,11 @@ let dirs =
   let doc = "The OCaml project directories." in
   Arg.(non_empty & pos_all existing_dirpath [] & info [] ~doc ~docv:"DIRECTORY")
 
-let fpath = Arg.conv (Fpath.of_string, Fpath.pp)
-
 let output =
   let doc = "The output file to write (defaults to standard output)." in
   let open Arg in
   value
-  & opt (some fpath) None
+  & opt (some Unic_cli.path) None
   & info [ "o"; "output" ] ~doc ~docv:"FILE"
 
 let setup_solver without_stdlib recurse exclude ignore forbid =
