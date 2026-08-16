@@ -7,6 +7,7 @@ module Opam = Uniq_opam
 module Option = Stdlib.Option
 
 let error_msgf fmt = Fmt.kstr (fun msg -> Error (`Msg msg)) fmt
+let ( let@ ) finally fn = Fun.protect ~finally fn
 
 exception Ambiguous_interface of Modname.t * Info.t list
 exception No_input of Modname.t
@@ -54,7 +55,7 @@ let prefer_stdlib ?stdlib solutions =
       List.find_opt in_stdlib solutions
       |> Option.value ~default:(List.hd solutions)
 
-let run _quiet cfg0 roots cfg1 policy dirs =
+let run _quiet cfg0 roots cfg1 policy dirs output =
   let ( let* ) = Result.bind in
   let* env = Uniq_clos.env ?cfg:cfg0 roots in
   let stdlib = Uniq_clos.stdlib env in
@@ -161,8 +162,20 @@ let run _quiet cfg0 roots cfg1 policy dirs =
         Opam.with_switch_state @@ fun sw ->
         Opam.package_names_of_meta_dirs ~sw dirs
       in
-      if pkgs <> [] then Fmt.pr "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
-      Ok ()
+      if pkgs <> [] then begin
+        let ppf, finally =
+          match output with
+          | None -> (Fmt.stdout, ignore)
+          | Some filename ->
+              let oc = open_out_bin (Fpath.to_string filename) in
+              let finally () = close_out oc in
+              (Format.formatter_of_out_channel oc, finally)
+        in
+        let@ () = finally in
+        Fmt.pf ppf "@[<v>%a@]\n%!" Fmt.(list ~sep:cut string) pkgs;
+        Ok ()
+      end
+      else Ok ()
   | _ ->
       let pp_hole ppf (m, info) =
         Fmt.pf ppf "  %a (needed by %a)" Modname.pp m Info.pp info
@@ -177,9 +190,9 @@ let run _quiet cfg0 roots cfg1 policy dirs =
         (pp_section "missing implementations")
         impl_holes
 
-let run quiet cfg0 roots cfg1 policy dirs =
+let run quiet cfg0 roots cfg1 policy dirs output =
   let result =
-    try run quiet cfg0 roots cfg1 policy dirs with
+    try run quiet cfg0 roots cfg1 policy dirs output with
     | Ambiguous_interface (modname, solutions) ->
         error_msgf
           "@[<v>%a is provided by several incompatible interfaces:@,%a@]"
@@ -239,6 +252,13 @@ let dirs =
   let doc = "The OCaml project directories." in
   Arg.(non_empty & pos_all existing_dirpath [] & info [] ~doc ~docv:"DIRECTORY")
 
+let output =
+  let doc = "The output file to write (defaults to standard output)." in
+  let open Arg in
+  value
+  & opt (some Unic_cli.path) None
+  & info [ "o"; "output" ] ~doc ~docv:"FILE"
+
 let setup_solver without_stdlib recurse exclude ignore forbid =
   let ignore = List.concat ignore in
   let forbid = List.concat forbid in
@@ -258,6 +278,7 @@ let term =
   $ setup_solver
   $ setup_policy
   $ dirs
+  $ output
 
 let cmd =
   let doc = "Infer packages an OCaml project should vendor." in
