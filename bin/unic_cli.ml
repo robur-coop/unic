@@ -204,10 +204,13 @@ let modname =
 let path =
   let parser str =
     match Fpath.of_string str with
-    | Ok v when Sys.file_exists str ->
-        let v = if Sys.is_directory str then Fpath.to_dir_path v else v in
+    | Ok v ->
+        let v =
+          if Sys.file_exists str && Sys.is_directory str then
+            Fpath.to_dir_path v
+          else v
+        in
         Ok v
-    | Ok v -> error_msgf "%a does not exist" Fpath.pp v
     | Error _ as err -> err
   in
   Arg.conv (parser, Fpath.pp)
