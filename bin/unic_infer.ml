@@ -229,7 +229,10 @@ let exclude =
     "Exclude a file, or a directory (and its sub-directories), from resolution."
   in
   let v = path in
-  Arg.(value & opt_all v [] & info [ "x"; "exclude" ] ~doc ~docv:"PATH")
+  let open Arg in
+  value
+  & opt_all v [ Fpath.v "_build"; Fpath.v "vendors" ]
+  & info [ "x"; "exclude" ] ~doc ~docv:"PATH"
 
 let ignore =
   let doc =
