@@ -44,8 +44,42 @@ gmp
 
 All that remains is for the user to find a way to recompile these `opam`
 packages using the Solo5 toolchain. If these packages use `dune`, simply
-_vendorise_ them (i.e. retrieve them using `opam source` and specify a directory
-containing their source code using `(vendored_dirs ...)`).
+_vendorise_ them (i.e. retrieve them using `opam source` and specify a
+directory containing their source code using `(vendored_dirs ...)`). You can
+also use our [`mfetch`][mfetch] to download dependencies.
+
+### Note about the project
+
+The aim of this project is to separate the issue of resolving dependencies and
+their versions from that of resolving the artefacts required to compile a
+project, and specifically to compile a unikernel. It stems from two
+observations:
+- the first is that, in the case of unikernels, there are dependencies that do
+  not need to be vendorised, since [`ocaml-solo5`][ocaml-solo5] does not alter
+  their compilation (compared to the default toolchain). In other words, it is
+  possible to use pre-compiled artefacts and simply link them to the unikernel
+  (as is the case, for example, with `fmt` or `cmdliner`)
+- the second is that resolving dependencies via their versions is a difficult
+  problem that has already been solved by `opam`. So let’s let `opam` do it!
+  [`opam-monorepo`][opam-monorepo] attempts this approach, but the inability to
+  find a solution (mainly because the ecosystem is changing) results in a
+  cryptic message that is difficult to decipher without an in-depth
+  understanding of the OCaml ecosystem...
+
+A final point is the lack of maintenance that `opam-monorepo` may have suffered
+(and still suffers?) from, and the lack of commitment from the organisations
+behind this project to improve the situation.
+
+With this in mind, we opted to use [`codept`][codept], created and maintained
+by [@Octachron][octachron] (who has in-depth knowledge of dependency resolution
+at the OCaml level). `unic` therefore relies on his work to resolve
+dependencies according to a given environment (by default, the OPAM
+environment).
+
+The project is initially focused on compiling unikernels, but it can also be
+used to compile static programmes (and to determine what needs to be vendored
+to statically link an executable), since, fundamentally, a unikernel is (also)
+the result of static linking.
 
 ### Some other tools
 
@@ -69,3 +103,8 @@ containing their source code using `(vendored_dirs ...)`).
 [solo5]: https://github.com/solo5/solo5
 [ocamlfind]: https://projects.camlcity.org/projects/findlib.html
 [mcrunch]: https://github.com/robur-coop/mcrunch
+[mfetch]: https://github.com/robur-coop/mfetch
+[ocaml-solo5]: https://github.com/mirage/ocaml-solo5
+[opam-monorepo]: https://github.com/tarides/opam-monorepo
+[codept]: https://github.com/Octachron/codept
+[octachron]: https://github.com/Octachron
