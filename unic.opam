@@ -26,6 +26,6 @@ depends: [
   "checkseum"   {with-test}
   "decompress"  {with-test}
   "digestif"    {with-test}
-  "opam"        {with-test & >= "2.6.0~alpha1"}
+#   "opam"        {with-test & >= "2.6.0~alpha1"}
 ]
 x-maintenance-intent: [ "(latest)" ]
