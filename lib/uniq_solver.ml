@@ -110,6 +110,31 @@ let not_in_forbidden_modules cfg modules =
 
 let sort = List.sort_uniq (fun (a, _) (b, _) -> Modname.compare a b)
 
+(* NOTE(dinosaure): a module [m] is a submodule of [solution] if [solution]
+   exports it. *)
+let exported_by (m, crc) solution =
+  let part = Info.Path.singleton m in
+  let fn (p, crc') =
+    match (crc, crc') with
+    | Some crc, Some crc' ->
+        Digest.equal crc crc' && Info.Path.is_a_part ~part p
+    | Some _, None -> false
+    | None, _ -> Info.Path.is_a_part ~part p
+  in
+  List.exists fn (Info.exports solution)
+
+let postpone ~providers modules =
+  let fn (m, crc) = (m, crc, providers ?crc m) in
+  let candidates = List.map fn modules in
+  let fn (m, crc, r) = Option.map (fun r -> (m, crc, r)) r in
+  let candidates = List.filter_map fn candidates in
+  let fn (m, crc) =
+    let fn (m', _, _) = Modname.compare m m' <> 0 in
+    let others = List.filter fn candidates in
+    not (List.exists (fun (_, _, s) -> exported_by (m, crc) s) others)
+  in
+  List.filter fn modules
+
 let solve_intfs ?disambiguate ~cfg:({ recurse; exclude; stdlib; _ } as cfg)
     ~providers dirs =
   let ( let* ) = Result.bind in
@@ -148,7 +173,32 @@ let solve_intfs ?disambiguate ~cfg:({ recurse; exclude; stdlib; _ } as cfg)
         let infos, progress, modules =
           match modules with
           | [] -> (infos, true, [])
-          | modules -> List.fold_left fn (infos, false, []) modules
+          | modules ->
+              (* NOTE(dinosaure): Subtle but useful. Here, we try to "postpone"
+                 certain solutions if their names are exported by a "top-level"
+                 module. For example, we look for the [Path] module, which is
+                 found as [path.cmi] ([compiler-libs]) but also as a submodule
+                 of [colombe.cmi]. The idea is to try [colombe.cmi] first (which
+                 also exports [Path]) and, if that doesn't work, to try
+                 [path.cmi] next. It's a rather odd heuristic which, in a way,
+                 prioritises resolving sub-modules first and then lets the CRC
+                 help us; if there's still no solution, it then suggests the
+                 top-level modules. Not sure what implications this might have,
+                 though... *)
+              begin match postpone ~providers modules with
+              | [] -> List.fold_left fn (infos, false, []) modules
+              | now ->
+                  let fn1 (m, _) =
+                    let fn2 (m', _) = Modname.compare m m' = 0 in
+                    List.exists fn2 now
+                  in
+                  let later = List.filter (Fun.negate fn1) modules in
+                  let infos, progress, rem =
+                    List.fold_left fn (infos, false, []) now
+                  in
+                  if progress then (infos, progress, List.rev_append later rem)
+                  else List.fold_left fn (infos, false, rem) later
+              end
         in
         if progress then go infos else Ok (infos, modules)
   in
